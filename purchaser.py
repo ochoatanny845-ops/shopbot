@@ -292,13 +292,13 @@ class AutoPurchaser:
         
         if msgs and msgs[0].text:
             text = msgs[0].text
-            # 解析余额（格式：💰 USDT: 2.87 或 USDT:2.87）
+            # 解析余额（格式：🏦 USDT : 2.87 或 💰 USDT: 2.87 或 USDT:2.87）
             import re
             # 尝试多种模式
             patterns = [
-                r'USDT[:\s]+(\d+\.?\d*)',  # 💰 USDT: 2.87
-                r'余额[:\s]+(\d+\.?\d*)',  # 余额: 2.87
-                r'(\d+\.?\d*)\s*USDT',     # 2.87 USDT
+                r'USDT\s*[:：]\s*(\d+\.?\d*)',  # 🏦 USDT : 2.87 / USDT: 2.87
+                r'余额\s*[:：]\s*(\d+\.?\d*)',  # 余额: 2.87
+                r'(\d+\.?\d*)\s*USDT',         # 2.87 USDT
             ]
             
             for pattern in patterns:
@@ -431,20 +431,35 @@ class AutoPurchaser:
         else:
             raise Exception('OKPay Bot 未返回按钮')
         
-        # 8. 等待余额更新（轮询源机器人余额）
-        print('  ⏳ 等待余额更新...')
+        # 8. 等待余额更新（监听到账提醒 + 定期检查）
+        print('  ⏳ 等待充值到账（最多 150 秒）...')
         old_balance = await self.check_balance()
         
-        for i in range(15):  # 最多等待 30 秒
-            await asyncio.sleep(2)
-            new_balance = await self.check_balance()
+        # 最多等待 150 秒（2.5 分钟），每 10 秒检查一次
+        for i in range(15):
+            await asyncio.sleep(10)
             
-            # 检查余额是否增加
-            if new_balance > old_balance:
-                print(f'✅ 充值成功！余额: ${old_balance} → ${new_balance}')
-                return True
+            # 方法1：检查是否有到账提醒消息
+            msgs = await self.client.get_messages(Config.SOURCE_BOT, limit=5)
+            for msg in msgs:
+                if msg.text and ('到账' in msg.text or '充值成功' in msg.text or '✅ 充值' in msg.text):
+                    print(f'  ✅ 检测到到账提醒: {msg.text[:50]}...')
+                    # 确认余额
+                    new_balance = await self.check_balance()
+                    if new_balance > old_balance:
+                        print(f'✅ 充值成功！余额: ${old_balance} → ${new_balance}')
+                        return True
+            
+            # 方法2：直接检查余额（避免频繁刷新主菜单）
+            if i % 2 == 0:  # 每 20 秒检查一次余额
+                new_balance = await self.check_balance()
+                if new_balance > old_balance:
+                    print(f'✅ 充值成功！余额: ${old_balance} → ${new_balance}')
+                    return True
+                else:
+                    print(f'  ⏳ 第 {i+1}/15 次检查，余额: ${new_balance} (等待中...)')
         
-        raise Exception('充值超时，余额未更新')
+        raise Exception('充值超时（150秒），余额未更新')
     
     async def stop(self):
         """停止客户端"""
