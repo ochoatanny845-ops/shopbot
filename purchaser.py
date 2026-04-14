@@ -3,7 +3,6 @@
 """
 import asyncio
 import os
-import zipfile
 from datetime import datetime
 from telethon import TelegramClient
 from config import Config
@@ -23,12 +22,12 @@ class AutoPurchaser:
             self.client = await ClientManager.get_client()
         print('✅ 代购模块已准备就绪')
     
-    async def purchase(self, product_id):
+    async def purchase(self, product_id, quantity=1):
         """
         购买商品
         
         Returns:
-            str: ZIP文件路径
+            list: 文件列表 [{'path': ..., 'name': ...}, ...]
         """
         # 查询商品信息
         conn = self.db.get_connection()
@@ -61,7 +60,7 @@ class AutoPurchaser:
             await self._click_buy()
             
             # 4. 输入数量
-            await self._input_quantity(1)
+            await self._input_quantity(quantity)
             
             # 5. 确认购买
             await self._confirm_purchase()
@@ -69,11 +68,8 @@ class AutoPurchaser:
             # 6. 等待并接收文件
             files = await self._wait_for_files()
             
-            # 7. 压缩文件
-            zip_path = self._zip_files(files, product_id)
-            
-            print(f'✅ 代购成功: {zip_path}')
-            return zip_path
+            print(f'✅ 代购成功: 收到 {len(files)} 个文件')
+            return files
             
         except Exception as e:
             print(f'❌ 代购失败: {e}')
@@ -81,8 +77,8 @@ class AutoPurchaser:
     
     async def _navigate_to_category(self, category):
         """导航到分类"""
-        # 发送 /start
-        await self.client.send_message(Config.SOURCE_BOT, '/start')
+        # 发送 🏠主菜单 回到主页
+        await self.client.send_message(Config.SOURCE_BOT, '🏠主菜单')
         await asyncio.sleep(2)
         
         # 点击"账号列表"
@@ -221,40 +217,6 @@ class AutoPurchaser:
             await asyncio.sleep(2)
         
         return files
-    
-    def _zip_files(self, files, product_id):
-        """压缩文件"""
-        # 创建输出目录
-        os.makedirs(Config.ORDER_FILES_DIR, exist_ok=True)
-        
-        # 生成ZIP文件名
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        zip_filename = f'order_{product_id}_{timestamp}.zip'
-        zip_path = os.path.join(Config.ORDER_FILES_DIR, zip_filename)
-        
-        # 压缩所有文件（包括 .txt 和 .zip）
-        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            for f in files:
-                # 保留原始文件名和扩展名
-                arcname = f['name']
-                
-                # 如果没有扩展名，根据内容判断
-                if not arcname or arcname == f'file_{len(files)}.txt':
-                    # 从路径中提取文件名
-                    arcname = os.path.basename(f['path'])
-                
-                zipf.write(f['path'], arcname)
-                print(f'  📦 添加到ZIP: {arcname}')
-        
-        # 删除临时文件
-        for f in files:
-            try:
-                os.remove(f['path'])
-            except Exception as e:
-                print(f'  ⚠️ 删除临时文件失败: {e}')
-        
-        print(f'✅ ZIP文件创建成功: {zip_path}')
-        return zip_path
     
     async def stop(self):
         """停止客户端"""

@@ -29,8 +29,8 @@ class ProductScraper:
         print(f'📊 开始抓取商品...')
         
         try:
-            # 发送 /start
-            await self.client.send_message(Config.SOURCE_BOT, '/start')
+            # 发送 🏠主菜单 回到主页
+            await self.client.send_message(Config.SOURCE_BOT, '🏠主菜单')
             await asyncio.sleep(2)
             
             # 点击"账号列表"

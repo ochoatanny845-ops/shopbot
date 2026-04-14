@@ -3,7 +3,7 @@
 """
 import re
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 from config import Config
 from database import Database
 
@@ -14,6 +14,7 @@ class SalesBot:
         self.db = Database()
         self.purchaser = purchaser
         self.app = None
+        self.user_states = {}  # 用户状态管理
     
     def build_app(self):
         """构建应用（不启动）"""
@@ -23,6 +24,7 @@ class SalesBot:
         self.app.add_handler(CommandHandler("start", self.cmd_start))
         self.app.add_handler(CommandHandler("add", self.cmd_add_balance))
         self.app.add_handler(CallbackQueryHandler(self.handle_callback))
+        self.app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message))
         
         print(f'✅ 销售机器人已构建: @{Config.BOT_USERNAME}')
         return self.app
@@ -294,7 +296,7 @@ class SalesBot:
         )
     
     async def _buy_product(self, query, product_id):
-        """购买商品"""
+        """购买商品 - 提示输入数量"""
         user_id = query.from_user.id
         
         # 查询商品
@@ -302,112 +304,188 @@ class SalesBot:
         c = conn.cursor()
         
         c.execute('''
-            SELECT name, selling_price, stock, original_price
+            SELECT name, selling_price, stock
             FROM products
             WHERE id = ? AND is_active = 1
         ''', (product_id,))
         
         product = c.fetchone()
+        conn.close()
         
         if not product:
             await query.edit_message_text(
                 "❌ 商品不存在或已下架",
                 reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("🔙 返回", callback_data="categories")
+                    InlineKeyboardButton("⬅️ 返回分类", callback_data="categories")
                 ]])
             )
-            conn.close()
             return
         
-        name, selling_price, stock, original_price = product
+        name, selling_price, stock = product
         
         if stock <= 0:
             await query.edit_message_text(
                 f"❌ 商品 {name} 已售罄",
                 reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("🔙 返回", callback_data="categories")
+                    InlineKeyboardButton("⬅️ 返回分类", callback_data="categories")
                 ]])
             )
-            conn.close()
             return
         
+        # 设置用户状态：等待输入数量
+        self.user_states[user_id] = {
+            'action': 'buy_quantity',
+            'product_id': product_id,
+            'product_name': name,
+            'price': selling_price,
+            'stock': stock
+        }
+        
+        await query.edit_message_text(
+            f"📱 商品信息\n\n"
+            f"🛍 商品：{name}\n"
+            f"💰 单价：${selling_price} USDT\n"
+            f"📦 库存：{stock} 个\n\n"
+            f"💬 请输入购买数量（1-{min(stock, 100)}）：",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("❌ 取消", callback_data="categories")
+            ]])
+        )
+    
+    async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """处理文本消息（用于输入购买数量）"""
+        user_id = update.effective_user.id
+        text = update.message.text.strip()
+        
+        # 检查用户状态
+        if user_id not in self.user_states:
+            return
+        
+        state = self.user_states[user_id]
+        
+        if state['action'] == 'buy_quantity':
+            await self._process_quantity(update, state, text)
+    
+    async def _process_quantity(self, update, state, text):
+        """处理购买数量输入"""
+        user_id = update.effective_user.id
+        
+        # 验证数量
+        try:
+            quantity = int(text)
+            if quantity <= 0 or quantity > min(state['stock'], 100):
+                await update.message.reply_text(
+                    f"❌ 数量无效\n\n"
+                    f"请输入 1-{min(state['stock'], 100)} 之间的数字"
+                )
+                return
+        except ValueError:
+            await update.message.reply_text(
+                "❌ 请输入有效的数字"
+            )
+            return
+        
+        # 计算总价
+        total_price = state['price'] * quantity
+        
         # 检查余额
+        conn = self.db.get_connection()
+        c = conn.cursor()
         c.execute('SELECT balance FROM users WHERE user_id = ?', (user_id,))
         user = c.fetchone()
         balance = user[0] if user else 0
         
-        if balance < selling_price:
-            await query.edit_message_text(
+        if balance < total_price:
+            await update.message.reply_text(
                 f"❌ 余额不足\n\n"
-                f"商品价格：${selling_price}\n"
+                f"总价：${total_price:.2f}\n"
                 f"当前余额：${balance:.2f}\n"
-                f"需要充值：${selling_price - balance:.2f}",
-                reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("💰 充值", callback_data="recharge")],
-                    [InlineKeyboardButton("🔙 返回", callback_data="categories")]
-                ])
+                f"需要充值：${total_price - balance:.2f}"
             )
             conn.close()
+            del self.user_states[user_id]
             return
         
         # 创建订单
         c.execute('''
             INSERT INTO orders (user_id, product_id, product_name, quantity, unit_price, total_price, status)
-            VALUES (?, ?, ?, 1, ?, ?, 'processing')
-        ''', (user_id, product_id, name, selling_price, selling_price))
+            VALUES (?, ?, ?, ?, ?, ?, 'processing')
+        ''', (user_id, state['product_id'], state['product_name'], quantity, state['price'], total_price))
         
         order_id = c.lastrowid
         
         # 扣除余额
-        new_balance = balance - selling_price
+        new_balance = balance - total_price
         c.execute('UPDATE users SET balance = ? WHERE user_id = ?', (new_balance, user_id))
         
         # 记录余额变动
         c.execute('''
             INSERT INTO balance_logs (user_id, amount, type, order_id, note)
             VALUES (?, ?, 'purchase', ?, ?)
-        ''', (user_id, -selling_price, order_id, f'购买 {name}'))
+        ''', (user_id, -total_price, order_id, f'购买 {state["product_name"]} x{quantity}'))
         
         conn.commit()
         conn.close()
         
-        await query.edit_message_text(
+        # 清除状态
+        del self.user_states[user_id]
+        
+        await update.message.reply_text(
             f"⏳ 订单处理中...\n\n"
-            f"商品：{name}\n"
-            f"价格：${selling_price}\n"
-            f"订单号：{order_id}\n\n"
+            f"🛍 商品：{state['product_name']}\n"
+            f"💰 单价：${state['price']}\n"
+            f"📦 数量：{quantity}\n"
+            f"💵 总价：${total_price:.2f}\n"
+            f"📋 订单号：{order_id}\n\n"
             f"正在自动代购，请稍候..."
         )
         
         # 调用代购模块
         try:
-            files = await self.purchaser.purchase(product_id)
+            files = await self.purchaser.purchase(state['product_id'], quantity)
             
             # 更新订单状态
             conn = self.db.get_connection()
             c = conn.cursor()
             c.execute('''
                 UPDATE orders 
-                SET status = 'completed', files_path = ?, completed_at = CURRENT_TIMESTAMP
+                SET status = 'completed', completed_at = CURRENT_TIMESTAMP
                 WHERE id = ?
-            ''', (files, order_id))
+            ''', (order_id,))
             conn.commit()
             conn.close()
             
-            # 发送文件
-            await query.message.reply_document(
-                document=open(files, 'rb'),
-                caption=f"✅ 购买成功！\n\n"
-                        f"商品：{name}\n"
-                        f"订单号：{order_id}\n\n"
-                        f"账号信息已压缩成ZIP文件，请下载查看。"
+            # 发送购买成功消息
+            caption = (
+                f"🗂 购买商品: {state['product_name']}\n"
+                f"💰 商品价格: {state['price']} USDT\n"
+                f"🛍 购买数量: {quantity}\n\n"
+                f"🗂文件打包完成 ♻️存活账号{quantity}\n"
+            )
+            
+            await update.message.reply_text(caption)
+            
+            # 发送 3 个文件
+            for file_info in files:
+                await update.message.reply_document(
+                    document=open(file_info['path'], 'rb'),
+                    filename=file_info['name']
+                )
+            
+            # 发送使用说明
+            await update.message.reply_text(
+                "📄 协议号: 适用于软件或脚本\n"
+                "🗂 直登号: 适用于在电脑直接登入\n"
+                "📎 Api链接: 适用于在网页上接收验证码以登录其他设备\n\n"
+                "✅ 所有账号均已删除缓存\n"
+                "⚠️ 请妥善保管好您的文件"
             )
             
         except Exception as e:
             # 退款
             conn = self.db.get_connection()
             c = conn.cursor()
-            c.execute('UPDATE users SET balance = balance + ? WHERE user_id = ?', (selling_price, user_id))
+            c.execute('UPDATE users SET balance = balance + ? WHERE user_id = ?', (total_price, user_id))
             c.execute('''
                 UPDATE orders 
                 SET status = 'failed', error_message = ?
@@ -416,14 +494,14 @@ class SalesBot:
             c.execute('''
                 INSERT INTO balance_logs (user_id, amount, type, order_id, note)
                 VALUES (?, ?, 'refund', ?, ?)
-            ''', (user_id, selling_price, order_id, f'退款：{str(e)}'))
+            ''', (user_id, total_price, order_id, f'退款：{str(e)}'))
             conn.commit()
             conn.close()
             
-            await query.message.reply_text(
+            await update.message.reply_text(
                 f"❌ 购买失败\n\n"
                 f"错误：{str(e)}\n\n"
-                f"已自动退款 ${selling_price}"
+                f"已自动退款 ${total_price:.2f}"
             )
     
     async def _show_recharge(self, query):
