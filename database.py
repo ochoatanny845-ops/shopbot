@@ -21,6 +21,22 @@ class Database:
         conn = self.get_connection()
         c = conn.cursor()
         
+        # 检查数据库文件是否损坏
+        try:
+            c.execute("SELECT name FROM sqlite_master WHERE type='table'")
+            tables = [row[0] for row in c.fetchall()]
+        except Exception as e:
+            print(f'⚠️ 数据库损坏，正在重建: {e}')
+            conn.close()
+            # 删除损坏的数据库
+            import os
+            if os.path.exists(self.db_path):
+                os.remove(self.db_path)
+            # 重新连接
+            conn = self.get_connection()
+            c = conn.cursor()
+            tables = []
+        
         # 用户表
         c.execute('''
             CREATE TABLE IF NOT EXISTS users (
@@ -101,5 +117,15 @@ class Database:
         ''')
         
         conn.commit()
+        
+        # 验证数据库
+        c.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        tables = [row[0] for row in c.fetchall()]
+        required_tables = ['users', 'products', 'orders', 'sync_logs', 'balance_logs']
+        
+        if all(t in tables for t in required_tables):
+            print('✅ 数据库初始化完成')
+        else:
+            print(f'⚠️ 数据库表不完整，缺少: {set(required_tables) - set(tables)}')
+        
         conn.close()
-        print('✅ 数据库初始化完成')

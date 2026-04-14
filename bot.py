@@ -23,6 +23,7 @@ class SalesBot:
         # 注册处理器
         self.app.add_handler(CommandHandler("start", self.cmd_start))
         self.app.add_handler(CommandHandler("add", self.cmd_add_balance))
+        self.app.add_handler(CommandHandler("fix_user", self.cmd_fix_user))
         self.app.add_handler(CallbackQueryHandler(self.handle_callback))
         self.app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message))
         
@@ -158,6 +159,68 @@ class SalesBot:
         except Exception as e:
             print(f"⚠️ 发送用户通知失败: {e}")
             # 不影响充值流程，只记录错误
+    
+    async def cmd_fix_user(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """管理员修复用户数据命令"""
+        user_id = update.effective_user.id
+        
+        # 检查权限
+        if user_id not in Config.ADMIN_IDS:
+            await update.message.reply_text("❌ 无权限")
+            return
+        
+        # 解析参数
+        if len(context.args) < 3:
+            await update.message.reply_text(
+                "📖 使用方法：\n"
+                "/fix_user <用户ID> <用户名> <余额>\n\n"
+                "例如：\n"
+                "/fix_user 5991190607 luoshen00 600"
+            )
+            return
+        
+        try:
+            target_user_id = int(context.args[0])
+            username = context.args[1]
+            balance = float(context.args[2])
+        except ValueError:
+            await update.message.reply_text("❌ 参数格式错误")
+            return
+        
+        # 修复用户数据
+        conn = self.db.get_connection()
+        c = conn.cursor()
+        
+        # 检查用户是否存在
+        c.execute('SELECT user_id FROM users WHERE user_id = ?', (target_user_id,))
+        exists = c.fetchone()
+        
+        if exists:
+            # 更新现有用户
+            c.execute('''
+                UPDATE users 
+                SET username = ?, balance = ?, last_activity = CURRENT_TIMESTAMP
+                WHERE user_id = ?
+            ''', (username, balance, target_user_id))
+            action = "更新"
+        else:
+            # 创建新用户
+            c.execute('''
+                INSERT INTO users (user_id, username, balance)
+                VALUES (?, ?, ?)
+            ''', (target_user_id, username, balance))
+            action = "创建"
+        
+        conn.commit()
+        conn.close()
+        
+        await update.message.reply_text(
+            f"✅ 用户{action}成功\n\n"
+            f"用户ID：`{target_user_id}`\n"
+            f"用户名：{username}\n"
+            f"余额：${balance:.2f}",
+            parse_mode='Markdown'
+        )
     
     async def cmd_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """处理 /start 命令"""
