@@ -14,9 +14,6 @@ class AutoPurchaser:
     # 全局锁：确保同一时间只处理一个订单
     _purchase_lock = asyncio.Lock()
     
-    # 余额预警阈值
-    BALANCE_WARNING_THRESHOLD = 20.0  # USDT
-    
     def __init__(self, client=None):
         self.db = Database()
         self.client = client  # 接收外部传入的客户端
@@ -27,15 +24,6 @@ class AutoPurchaser:
             from client_manager import ClientManager
             self.client = await ClientManager.get_client()
         print('✅ 代购模块已准备就绪')
-    
-    async def notify_admin(self, message):
-        """通知管理员"""
-        try:
-            for admin_id in Config.ADMIN_IDS:
-                await self.client.send_message(admin_id, message)
-                print(f'✅ 已通知管理员 {admin_id}')
-        except Exception as e:
-            print(f'⚠️ 通知管理员失败: {e}')
     
     async def purchase(self, product_id, quantity=1, user_id=None, order_id=None):
         """
@@ -84,15 +72,6 @@ class AutoPurchaser:
                 balance = await self.check_balance()
                 required_amount = price * quantity
                 
-                # 检查源机器人余额预警
-                if balance < self.BALANCE_WARNING_THRESHOLD:
-                    await self.notify_admin(
-                        '⚠️ **余额预警**\n\n'
-                        f'🏦 源机器人余额不足 ${self.BALANCE_WARNING_THRESHOLD}\n'
-                        f'当前余额: ${balance:.2f}\n'
-                        '建议充值以确保后续订单顺利处理'
-                    )
-                
                 if balance < required_amount:
                     shortage = required_amount - balance
                     # 向上取整（源机器人只接受整数充值）
@@ -106,20 +85,7 @@ class AutoPurchaser:
                         await self.auto_recharge(recharge_amount)
                         print('✅ 充值成功，继续购买')
                     except Exception as e:
-                        error_msg = str(e)
-                        
-                        # 如果是 OKPay 余额不足，管理员已经收到通知了
-                        if 'OKPay 钱包余额不足' in error_msg:
-                            raise Exception(f'自动充值失败: {error_msg}')
-                        else:
-                            # 其他错误，通知管理员
-                            await self.notify_admin(
-                                '⚠️ **充值失败**\n\n'
-                                f'错误信息: {error_msg}\n'
-                                f'订单 #{order_id}\n'
-                                f'用户: {user_id}'
-                            )
-                            raise Exception(f'自动充值失败: {error_msg}\n请手动充值后重试')
+                        raise Exception(f'自动充值失败: {e}')
                 else:
                     print(f'✅ 余额充足 (需要: ${required_amount:.2f}, 余额: ${balance:.2f})')
                 
@@ -508,15 +474,6 @@ class AutoPurchaser:
                 # 检测充值失败消息
                 if '余额不足' in msg_text or '操作失败' in msg_text:
                     print(f'  ❌ 检测到充值失败: {msg_text[:80]}...')
-                    
-                    # 通知管理员：OKPay 钱包余额不足
-                    await self.notify_admin(
-                        '⚠️ **余额预警**\n\n'
-                        '💳 OKPay 钱包余额不足\n'
-                        f'需要充值金额: ${amount}\n'
-                        '操作失败，请及时充值 OKPay 钱包'
-                    )
-                    
                     raise Exception('充值失败：OKPay 钱包余额不足')
             
             # 打印等待进度
