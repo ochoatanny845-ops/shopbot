@@ -390,28 +390,28 @@ class AutoPurchaser:
         if not payment_url:
             raise Exception('未找到支付链接')
         
-        # 6. 打开支付链接（如果是 t.me/okpaybot 开头）
+        # 6. 打开支付链接（如果是 t.me/okpay 开头）
         # Telethon 会自动处理深链接
-        if 'okpaybot' in payment_url or 't.me' in payment_url:
+        if 'okpay' in payment_url or 't.me' in payment_url:
             print('  ✅ 正在打开 OKPay 支付页面...')
             
-            # 方法1：直接通过 start 参数打开（推荐）
+            # 提取 start 参数（例如：t.me/okpay?start=xxx）
             import re
-            # 提取 start 参数（例如：t.me/okpaybot?start=xxx）
             start_match = re.search(r'start=([^&]+)', payment_url)
             if start_match:
                 start_param = start_match.group(1)
-                await self.client.send_message('@okpaybot', f'/start {start_param}')
+                # 正确的 Bot 用户名：@okpay（不是 @okpaybot）
+                await self.client.send_message('@okpay', f'/start {start_param}')
             else:
                 # 没有 start 参数，直接发送链接
-                await self.client.send_message('@okpaybot', '/start')
+                await self.client.send_message('@okpay', '/start')
             
             await asyncio.sleep(3)
         else:
             print(f'  ⚠️ 未知的支付链接格式: {payment_url}')
         
         # 7. 点击"确认支付"（在 OKPay Bot 中）
-        msgs = await self.client.get_messages('@okpaybot', limit=1)
+        msgs = await self.client.get_messages('@okpay', limit=1)
         if msgs and msgs[0].buttons:
             clicked = False
             for row in msgs[0].buttons:
