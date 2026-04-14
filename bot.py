@@ -21,6 +21,7 @@ class SalesBot:
         
         # 注册处理器
         self.app.add_handler(CommandHandler("start", self.cmd_start))
+        self.app.add_handler(CommandHandler("add", self.cmd_add_balance))
         self.app.add_handler(CallbackQueryHandler(self.handle_callback))
         
         print(f'✅ 销售机器人已构建: @{Config.BOT_USERNAME}')
@@ -42,6 +43,119 @@ class SalesBot:
             await self.app.updater.stop()
             await self.app.stop()
             await self.app.shutdown()
+    
+    async def cmd_add_balance(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """管理员余额调整命令"""
+        user_id = update.effective_user.id
+        
+        # 检查权限
+        if user_id not in Config.ADMIN_IDS:
+            await update.message.reply_text("❌ 无权限")
+            return
+        
+        # 解析参数
+        if len(context.args) < 2:
+            await update.message.reply_text(
+                "📖 使用方法：\n"
+                "/add <用户ID> <金额>\n\n"
+                "例如：\n"
+                "/add 5991190607 10     # 充值 $10\n"
+                "/add 5991190607 -5    # 扣款 $5"
+            )
+            return
+        
+        try:
+            target_user_id = int(context.args[0])
+            amount = float(context.args[1])
+        except ValueError:
+            await update.message.reply_text("❌ 参数格式错误")
+            return
+        
+        # 调整余额
+        conn = self.db.get_connection()
+        c = conn.cursor()
+        
+        # 确保用户存在
+        c.execute('SELECT balance FROM users WHERE user_id = ?', (target_user_id,))
+        user = c.fetchone()
+        
+        if not user:
+            await update.message.reply_text(f"❌ 用户 {target_user_id} 不存在")
+            conn.close()
+            return
+        
+        old_balance = user[0]
+        new_balance = old_balance + amount
+        
+        # 检查余额不能为负
+        if new_balance < 0:
+            await update.message.reply_text(
+                f"❌ 余额不足\n\n"
+                f"当前余额：${old_balance:.2f}\n"
+                f"扣款金额：${abs(amount):.2f}\n"
+                f"差额：${abs(new_balance):.2f}"
+            )
+            conn.close()
+            return
+        
+        # 更新余额
+        c.execute('UPDATE users SET balance = ? WHERE user_id = ?', (new_balance, target_user_id))
+        
+        # 记录日志
+        log_type = 'recharge' if amount > 0 else 'deduct'
+        note = f"管理员{'充值' if amount > 0 else '扣款'}"
+        
+        c.execute('''
+            INSERT INTO balance_logs (user_id, amount, type, note)
+            VALUES (?, ?, ?, ?)
+        ''', (target_user_id, amount, log_type, note))
+        
+        conn.commit()
+        conn.close()
+        
+        # 发送确认消息给管理员
+        emoji = "✅" if amount > 0 else "⚠️"
+        action = "充值" if amount > 0 else "扣款"
+        
+        await update.message.reply_text(
+            f"{emoji} {action}成功\n\n"
+            f"用户ID：`{target_user_id}`\n"
+            f"金额：${amount:+.2f}\n"
+            f"原余额：${old_balance:.2f}\n"
+            f"新余额：${new_balance:.2f}",
+            parse_mode='Markdown'
+        )
+        
+        # 发送通知给用户
+        try:
+            if amount > 0:
+                # 充值通知
+                user_message = (
+                    f"💰 充值成功\n\n"
+                    f"充值金额：**${amount:.2f}**\n"
+                    f"当前余额：**${new_balance:.2f}**\n\n"
+                    f"感谢您的充值！现在可以购买账号了 🎉"
+                )
+            else:
+                # 扣款通知
+                user_message = (
+                    f"⚠️ 余额变动通知\n\n"
+                    f"扣款金额：**${abs(amount):.2f}**\n"
+                    f"当前余额：**${new_balance:.2f}**\n\n"
+                    f"如有疑问，请联系管理员"
+                )
+            
+            await context.bot.send_message(
+                chat_id=target_user_id,
+                text=user_message,
+                parse_mode='Markdown'
+            )
+            
+            print(f"✅ 已发送通知给用户 {target_user_id}")
+            
+        except Exception as e:
+            print(f"⚠️ 发送用户通知失败: {e}")
+            # 不影响充值流程，只记录错误
     
     async def cmd_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """处理 /start 命令"""
@@ -116,7 +230,7 @@ class SalesBot:
             await query.edit_message_text(
                 "⚠️ 暂无商品\n\n请稍后再试！",
                 reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("🔙 返回", callback_data="back_main")
+                    InlineKeyboardButton("🏠 返回主菜单", callback_data="back_main")
                 ]])
             )
             return
@@ -128,7 +242,7 @@ class SalesBot:
                 callback_data=f"cat_{cat}"
             )])
         
-        keyboard.append([InlineKeyboardButton("🔙 返回", callback_data="back_main")])
+        keyboard.append([InlineKeyboardButton("🏠 返回主菜单", callback_data="back_main")])
         
         await query.edit_message_text(
             "📱 请选择分类：",
@@ -155,7 +269,8 @@ class SalesBot:
             await query.edit_message_text(
                 f"⚠️ 分类 {category} 暂无商品",
                 reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("🔙 返回", callback_data="categories")
+                    InlineKeyboardButton("⬅️ 返回分类", callback_data="categories"),
+                    InlineKeyboardButton("🏠 主菜单", callback_data="back_main")
                 ]])
             )
             return
@@ -167,7 +282,10 @@ class SalesBot:
                 callback_data=f"buy_{pid}"
             )])
         
-        keyboard.append([InlineKeyboardButton("🔙 返回", callback_data="categories")])
+        keyboard.append([
+            InlineKeyboardButton("⬅️ 返回分类", callback_data="categories"),
+            InlineKeyboardButton("🏠 主菜单", callback_data="back_main")
+        ])
         
         await query.edit_message_text(
             f"📱 {category} 商品列表：\n\n"
@@ -310,14 +428,20 @@ class SalesBot:
     
     async def _show_recharge(self, query):
         """显示充值说明"""
+        admin_link = f"tg://user?id={Config.ADMIN_IDS[0]}"
+        
         await query.edit_message_text(
-            "💰 充值说明\n\n"
-            "请联系管理员充值：\n"
-            f"管理员ID：`{Config.ADMIN_IDS[0]}`\n\n"
-            "充值后余额会自动到账。",
-            reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("🔙 返回", callback_data="back_main")
-            ]]),
+            "💰 充值余额\n\n"
+            "📱 联系管理员充值：\n"
+            f"   管理员ID：`{Config.ADMIN_IDS[0]}`\n\n"
+            "💡 充值后余额会自动到账\n"
+            "📊 支持的操作：\n"
+            "   • 充值（增加余额）\n"
+            "   • 扣款（减少余额）",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("💬 联系管理员", url=admin_link)],
+                [InlineKeyboardButton("🏠 返回主菜单", callback_data="back_main")]
+            ]),
             parse_mode='Markdown'
         )
     
@@ -343,7 +467,7 @@ class SalesBot:
             await query.edit_message_text(
                 "📋 暂无订单",
                 reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("🔙 返回", callback_data="back_main")
+                    InlineKeyboardButton("🏠 返回主菜单", callback_data="back_main")
                 ]])
             )
             return
@@ -363,7 +487,7 @@ class SalesBot:
         await query.edit_message_text(
             text,
             reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("🔙 返回", callback_data="back_main")
+                InlineKeyboardButton("🏠 返回主菜单", callback_data="back_main")
             ]])
         )
     
@@ -378,7 +502,7 @@ class SalesBot:
             "5. 接收账号文件\n\n"
             "如有问题，请联系管理员。",
             reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("🔙 返回", callback_data="back_main")
+                InlineKeyboardButton("🏠 返回主菜单", callback_data="back_main")
             ]])
         )
     
