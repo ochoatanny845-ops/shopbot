@@ -290,8 +290,14 @@ class AutoPurchaser:
         # 获取最新消息
         msgs = await self.client.get_messages(Config.SOURCE_BOT, limit=1)
         
-        if msgs and msgs[0].text:
-            text = msgs[0].text
+        if msgs and msgs[0]:
+            # 使用 message 属性而不是 text（避免 Markdown 格式问题）
+            text = msgs[0].message if hasattr(msgs[0], 'message') else msgs[0].text
+            
+            if not text:
+                print('⚠️ 消息为空，返回 0')
+                return 0
+            
             # 解析余额（格式：🏦 USDT : 2.87 或 💰 USDT: 2.87 或 USDT:2.87）
             import re
             # 尝试多种模式
@@ -308,19 +314,20 @@ class AutoPurchaser:
                     print(f'💰 代购账号余额: ${balance}')
                     return balance
             
-            # 无法解析时，打印十六进制调试
-            import binascii
-            # 查找 USDT 所在行
+            # 无法解析时，打印调试信息
+            print(f'⚠️ 无法解析余额')
+            print(f'   原始文本: {repr(text[:200])}')
+            
+            # 打印十六进制（查找特殊字符）
             for line in text.split('\n'):
                 if 'USDT' in line:
-                    print(f'⚠️ USDT 行原始内容: {repr(line)}')
-                    print(f'   十六进制: {binascii.hexlify(line.encode()).decode()}')
+                    import binascii
+                    print(f'   USDT行: {repr(line)}')
+                    print(f'   HEX: {binascii.hexlify(line.encode()).decode()}')
                     break
-            
-            print(f'⚠️ 无法解析余额，原始文本:\n{text[:200]}')
         
         # 无法获取余额时返回 0
-        print('⚠️ 无法解析余额，返回 0')
+        print('⚠️ 返回余额 0')
         return 0
     
     async def auto_recharge(self, amount):
