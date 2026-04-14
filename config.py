@@ -1,0 +1,69 @@
+"""
+配置文件
+"""
+import os
+from dotenv import load_dotenv
+
+# 加载 .env 文件
+load_dotenv()
+
+class Config:
+    """系统配置"""
+    
+    # ============================================
+    # Telegram API 配置
+    # ============================================
+    API_ID = int(os.getenv('API_ID', '2040'))
+    API_HASH = os.getenv('API_HASH', 'b18441a1ff607e10a989891a5462e627')
+    
+    # ============================================
+    # 销售机器人配置
+    # ============================================
+    BOT_TOKEN = os.getenv('BOT_TOKEN', '8675984914:AAHG3RmeBBSNgUjYKwm0KrwklsFlElln8KY')
+    BOT_USERNAME = os.getenv('BOT_USERNAME', 'TGaccbbbot')
+    
+    # 管理员用户ID（逗号分隔）
+    ADMIN_IDS = [int(x.strip()) for x in os.getenv('ADMIN_IDS', '6919491196').split(',')]
+    
+    # ============================================
+    # 源机器人配置
+    # ============================================
+    SOURCE_BOT = os.getenv('SOURCE_BOT', 'hao24bot')
+    
+    # 代购账号 session 文件路径
+    BUYER_SESSION = os.getenv('BUYER_SESSION', 'sessions/new/573166025225')
+    BUYER_2FA = os.getenv('BUYER_2FA', '600')
+    
+    # ============================================
+    # 定价配置
+    # ============================================
+    # 固定加价（美元）
+    MARKUP_FIXED = float(os.getenv('MARKUP_FIXED', '0.05'))
+    
+    # 最低利润（美元）
+    MIN_PROFIT = float(os.getenv('MIN_PROFIT', '0.05'))
+    
+    # ============================================
+    # 同步配置
+    # ============================================
+    # 同步间隔（秒）
+    SYNC_INTERVAL = int(os.getenv('SYNC_INTERVAL', '3600'))  # 1小时
+    
+    # 请求延迟（秒）
+    REQUEST_DELAY = int(os.getenv('REQUEST_DELAY', '3'))
+    
+    # ============================================
+    # 数据库配置
+    # ============================================
+    DATABASE_PATH = os.getenv('DATABASE_PATH', 'shopbot.db')
+    
+    # ============================================
+    # 文件存储配置
+    # ============================================
+    # 订单文件存储目录
+    ORDER_FILES_DIR = os.getenv('ORDER_FILES_DIR', 'orders')
+    
+    # ============================================
+    # 日志配置
+    # ============================================
+    LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')

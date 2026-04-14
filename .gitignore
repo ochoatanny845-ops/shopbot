@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+
+# 数据库
+*.db
+*.sqlite
+*.sqlite3
+
+# Session 文件
+*.session
+*.session-journal
+
+# 环境变量
+.env
+
+# 订单文件
+orders/
+*.zip
+
+# 日志
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 系统文件
+.DS_Store
+Thumbs.db
