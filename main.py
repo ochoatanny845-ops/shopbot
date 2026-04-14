@@ -33,12 +33,16 @@ async def main():
     # 初始化数据库
     db = Database()
     
-    # 初始化代购模块
-    purchaser = AutoPurchaser()
+    # 登录代购账号（只登录一次）
+    from client_manager import ClientManager
+    buyer_client = await ClientManager.get_client()
+    
+    # 初始化代购模块（共享客户端）
+    purchaser = AutoPurchaser(buyer_client)
     await purchaser.start()
     
-    # 初始化商品抓取器
-    scraper = ProductScraper()
+    # 初始化商品抓取器（共享客户端）
+    scraper = ProductScraper(buyer_client)
     await scraper.start()
     
     # 首次同步商品
