@@ -2,6 +2,7 @@
 商品抓取模块
 """
 import asyncio
+import os
 import re
 from datetime import datetime
 from telethon import TelegramClient
@@ -17,14 +18,51 @@ class ProductScraper:
         self.client = None
     
     async def start(self):
-        """启动客户端"""
+        """启动客户端（智能登录）"""
         self.client = TelegramClient(
             Config.BUYER_SESSION,
             Config.API_ID,
             Config.API_HASH
         )
-        await self.client.start(password=Config.BUYER_2FA)
-        print(f'✅ 代购账号登录成功')
+        
+        # 检测 Session 是否存在
+        session_file = Config.BUYER_SESSION + '.session'
+        if os.path.exists(session_file):
+            print('🔍 检测到 Session 文件，尝试自动登录...')
+            try:
+                # 尝试使用 Session 自动登录
+                await self.client.start(password=lambda: Config.BUYER_2FA or None)
+                me = await self.client.get_me()
+                print(f'✅ 代购账号登录成功: {me.first_name} ({me.phone})')
+                return
+            except Exception as e:
+                print(f'⚠️ Session 失效: {e}')
+                print('📞 需要重新登录...\n')
+        
+        # 首次登录或 Session 失效
+        print('='*60)
+        print('📱 首次登录 - 需要手机号和验证码')
+        print('='*60)
+        
+        phone = input('请输入手机号（带国家代码，如 +8613800138000）: ').strip()
+        
+        # 定义密码函数
+        def get_password():
+            if Config.BUYER_2FA:
+                return Config.BUYER_2FA
+            return input('请输入两步验证密码（如果没有请直接回车）: ').strip() or None
+        
+        await self.client.start(
+            phone=phone,
+            password=get_password
+        )
+        
+        me = await self.client.get_me()
+        print(f'\n✅ 登录成功！')
+        print(f'   账号: {me.first_name}')
+        print(f'   手机: {me.phone}')
+        print(f'   Session 已保存到: {session_file}')
+        print('='*60 + '\n')
     
     async def scrape_all(self):
         """抓取所有商品"""

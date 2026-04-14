@@ -30,9 +30,11 @@ class Config:
     # ============================================
     SOURCE_BOT = os.getenv('SOURCE_BOT', 'hao24bot')
     
-    # 代购账号 session 文件路径
-    BUYER_SESSION = os.getenv('BUYER_SESSION', 'sessions/new/573166025225')
-    BUYER_2FA = os.getenv('BUYER_2FA', '600')
+    # 代购账号 session 文件路径（不含 .session 扩展名）
+    BUYER_SESSION = os.getenv('BUYER_SESSION', 'sessions/buyer_account')
+    
+    # 两步验证密码（可选，留空则运行时输入）
+    BUYER_2FA = os.getenv('BUYER_2FA', '')
     
     # ============================================
     # 定价配置
