@@ -14,13 +14,16 @@ sys.stdout.reconfigure(encoding='utf-8')
 
 async def sync_products_loop(scraper):
     """商品同步循环"""
+    # 先等待，再同步
+    await asyncio.sleep(Config.SYNC_INTERVAL)
+    
     while True:
         try:
-            print(f'\n📊 开始同步商品...')
+            print(f'\n🔄 开始定时同步商品...')
             await scraper.scrape_all()
-            print(f'✅ 同步完成，等待 {Config.SYNC_INTERVAL} 秒后再次同步\n')
+            print(f'✅ 定时同步完成，下次同步时间: {Config.SYNC_INTERVAL // 60} 分钟后\n')
         except Exception as e:
-            print(f'❌ 同步失败: {e}')
+            print(f'❌ 定时同步失败: {e}')
         
         await asyncio.sleep(Config.SYNC_INTERVAL)
 
@@ -45,13 +48,24 @@ async def main():
     scraper = ProductScraper(buyer_client)
     await scraper.start()
     
-    # 首次同步商品
-    try:
-        await scraper.scrape_all()
-    except Exception as e:
-        print(f'⚠️ 首次同步失败: {e}')
+    # 检查数据库中是否有商品
+    conn = db.get_connection()
+    c = conn.cursor()
+    c.execute('SELECT COUNT(*) FROM products WHERE is_active = 1')
+    product_count = c.fetchone()[0]
+    conn.close()
     
-    # 启动定时同步（后台任务）
+    if product_count > 0:
+        print(f'✅ 检测到 {product_count} 个商品，跳过首次同步')
+        print(f'⏰ 将在 {Config.SYNC_INTERVAL // 60} 分钟后自动同步')
+    else:
+        print('📊 首次启动，开始抓取商品...')
+        try:
+            await scraper.scrape_all()
+        except Exception as e:
+            print(f'⚠️ 首次同步失败: {e}')
+    
+    # 启动定时同步（60分钟后开始）
     asyncio.create_task(sync_products_loop(scraper))
     
     # 启动销售机器人（异步方式）
