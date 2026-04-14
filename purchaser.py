@@ -11,6 +11,9 @@ from database import Database
 class AutoPurchaser:
     """自动代购器"""
     
+    # 全局锁：确保同一时间只处理一个订单
+    _purchase_lock = asyncio.Lock()
+    
     def __init__(self, client=None):
         self.db = Database()
         self.client = client  # 接收外部传入的客户端
@@ -22,58 +25,78 @@ class AutoPurchaser:
             self.client = await ClientManager.get_client()
         print('✅ 代购模块已准备就绪')
     
-    async def purchase(self, product_id, quantity=1):
+    async def purchase(self, product_id, quantity=1, user_id=None, order_id=None):
         """
-        购买商品
+        购买商品（串行处理，确保订单不混淆）
+        
+        Args:
+            product_id: 商品ID
+            quantity: 购买数量
+            user_id: 用户ID（用于创建隔离目录）
+            order_id: 订单ID（用于目录命名）
         
         Returns:
             list: 文件列表 [{'path': ..., 'name': ...}, ...]
         """
-        # 查询商品信息
-        conn = self.db.get_connection()
-        c = conn.cursor()
-        
-        c.execute('''
-            SELECT name, category, original_price
-            FROM products
-            WHERE id = ? AND is_active = 1
-        ''', (product_id,))
-        
-        product = c.fetchone()
-        conn.close()
-        
-        if not product:
-            raise Exception('商品不存在')
-        
-        name, category, price = product
-        
-        print(f'📦 开始代购: {name}')
-        
-        try:
-            # 1. 导航到分类
-            await self._navigate_to_category(category)
+        # 🔒 全局锁：同一时间只处理一个订单
+        async with AutoPurchaser._purchase_lock:
+            print(f'🔒 订单 #{order_id} (用户 {user_id}) 开始处理...')
             
-            # 2. 查找并点击商品
-            await self._click_product(name)
+            # 查询商品信息
+            conn = self.db.get_connection()
+            c = conn.cursor()
             
-            # 3. 点击购买
-            await self._click_buy()
+            c.execute('''
+                SELECT name, category, original_price
+                FROM products
+                WHERE id = ? AND is_active = 1
+            ''', (product_id,))
             
-            # 4. 输入数量
-            await self._input_quantity(quantity)
+            product = c.fetchone()
+            conn.close()
             
-            # 5. 确认购买
-            await self._confirm_purchase()
+            if not product:
+                raise Exception('商品不存在')
             
-            # 6. 等待并接收文件
-            files = await self._wait_for_files()
+            name, category, price = product
             
-            print(f'✅ 代购成功: 收到 {len(files)} 个文件')
-            return files
+            print(f'📦 开始代购: {name} (数量: {quantity})')
             
-        except Exception as e:
-            print(f'❌ 代购失败: {e}')
-            raise
+            try:
+                # 创建用户专属目录
+                user_dir = os.path.join(Config.ORDER_FILES_DIR, str(user_id), f'order_{order_id}')
+                os.makedirs(user_dir, exist_ok=True)
+                print(f'📁 文件保存路径: {user_dir}')
+                
+                # 记录购买前的最后消息ID（用于隔离）
+                msgs = await self.client.get_messages(Config.SOURCE_BOT, limit=1)
+                last_msg_id = msgs[0].id if msgs else 0
+                print(f'📍 起始消息ID: {last_msg_id}')
+                
+                # 1. 导航到分类
+                await self._navigate_to_category(category)
+                
+                # 2. 查找并点击商品
+                await self._click_product(name)
+                
+                # 3. 点击购买
+                await self._click_buy()
+                
+                # 4. 输入数量
+                await self._input_quantity(quantity)
+                
+                # 5. 确认购买
+                await self._confirm_purchase()
+                
+                # 6. 等待并接收文件（只接收 last_msg_id 之后的）
+                files = await self._wait_for_files(after_msg_id=last_msg_id, save_dir=user_dir)
+                
+                print(f'✅ 订单 #{order_id} 代购成功: 收到 {len(files)} 个文件')
+                return files
+                
+            except Exception as e:
+                print(f'❌ 订单 #{order_id} 代购失败: {e}')
+                raise
     
     async def _navigate_to_category(self, category):
         """导航到分类"""
@@ -174,9 +197,18 @@ class AutoPurchaser:
         
         raise Exception('未找到确认按钮')
     
-    async def _wait_for_files(self):
-        """等待并接收文件（txt + 2个zip）"""
-        print('⏳ 等待文件...')
+    async def _wait_for_files(self, after_msg_id=0, save_dir=None):
+        """
+        等待并接收文件（txt + 2个zip）
+        
+        Args:
+            after_msg_id: 只接收这个消息ID之后的文件（隔离机制）
+            save_dir: 文件保存目录（用户隔离）
+        """
+        print(f'⏳ 等待文件（仅接收消息ID > {after_msg_id}）...')
+        
+        if save_dir is None:
+            save_dir = Config.ORDER_FILES_DIR
         
         files = []
         start_time = asyncio.get_event_loop().time()
@@ -191,18 +223,23 @@ class AutoPurchaser:
             msgs = await self.client.get_messages(Config.SOURCE_BOT, limit=10)
             
             for msg in msgs:
+                # 🔒 关键隔离：只接收 after_msg_id 之后的消息
+                if msg.id <= after_msg_id:
+                    continue
+                
                 if msg.document and msg.id not in [f['msg_id'] for f in files]:
                     file_ext = (msg.file.ext or '').lower()
                     
                     # 只接收 txt 和 zip 文件，忽略 mp4
                     if file_ext not in ['.txt', '.zip']:
+                        print(f'  ⏭ 跳过文件: {msg.file.name} (类型: {file_ext})')
                         continue
                     
                     # 获取文件信息
                     file_name = msg.file.name or f'file_{len(files) + 1}{file_ext}'
                     
-                    # 下载文件
-                    file_path = await msg.download_media(file=Config.ORDER_FILES_DIR)
+                    # 下载文件到用户目录
+                    file_path = await msg.download_media(file=save_dir)
                     
                     files.append({
                         'msg_id': msg.id,

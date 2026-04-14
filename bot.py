@@ -440,9 +440,14 @@ class SalesBot:
             f"正在自动代购，请稍候..."
         )
         
-        # 调用代购模块
+        # 调用代购模块（传递 user_id 和 order_id 用于隔离）
         try:
-            files = await self.purchaser.purchase(state['product_id'], quantity)
+            files = await self.purchaser.purchase(
+                product_id=state['product_id'],
+                quantity=quantity,
+                user_id=user_id,
+                order_id=order_id
+            )
             
             # 更新订单状态
             conn = self.db.get_connection()
