@@ -346,7 +346,7 @@ class SalesBot:
             f"🛍 商品：{name}\n"
             f"💰 单价：${selling_price} USDT\n"
             f"📦 库存：{stock} 个\n\n"
-            f"💬 请输入购买数量（1-{min(stock, 100)}）：",
+            f"💬 请输入购买数量（1-{stock}）：",
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton("❌ 取消", callback_data="categories")
             ]])
@@ -373,10 +373,10 @@ class SalesBot:
         # 验证数量
         try:
             quantity = int(text)
-            if quantity <= 0 or quantity > min(state['stock'], 100):
+            if quantity <= 0 or quantity > state['stock']:
                 await update.message.reply_text(
                     f"❌ 数量无效\n\n"
-                    f"请输入 1-{min(state['stock'], 100)} 之间的数字"
+                    f"请输入 1-{state['stock']} 之间的数字"
                 )
                 return
         except ValueError:

@@ -175,14 +175,14 @@ class AutoPurchaser:
         raise Exception('未找到确认按钮')
     
     async def _wait_for_files(self):
-        """等待并接收文件"""
+        """等待并接收文件（txt + 2个zip）"""
         print('⏳ 等待文件...')
         
         files = []
         start_time = asyncio.get_event_loop().time()
         timeout = 60  # 60秒超时
         
-        while len(files) < 3:
+        while len(files) < 3:  # 1 txt + 2 zip = 3个文件
             # 检查超时
             if asyncio.get_event_loop().time() - start_time > timeout:
                 raise Exception('接收文件超时')
@@ -192,9 +192,14 @@ class AutoPurchaser:
             
             for msg in msgs:
                 if msg.document and msg.id not in [f['msg_id'] for f in files]:
+                    file_ext = (msg.file.ext or '').lower()
+                    
+                    # 只接收 txt 和 zip 文件，忽略 mp4
+                    if file_ext not in ['.txt', '.zip']:
+                        continue
+                    
                     # 获取文件信息
-                    file_name = msg.file.name or f'file_{len(files) + 1}'
-                    file_ext = msg.file.ext or ''
+                    file_name = msg.file.name or f'file_{len(files) + 1}{file_ext}'
                     
                     # 下载文件
                     file_path = await msg.download_media(file=Config.ORDER_FILES_DIR)
@@ -208,7 +213,7 @@ class AutoPurchaser:
                     })
                     
                     # 显示文件类型
-                    file_type = '📄 TXT' if file_ext == '.txt' else '📦 ZIP' if file_ext == '.zip' else '📁 文件'
+                    file_type = '📄 TXT' if file_ext == '.txt' else '📦 ZIP'
                     print(f'  ✅ {file_type} 接收 {len(files)}/3: {file_name} ({msg.file.size} bytes)')
                     
                     if len(files) >= 3:
