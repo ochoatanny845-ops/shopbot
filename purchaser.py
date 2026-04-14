@@ -74,10 +74,12 @@ class AutoPurchaser:
                 
                 if balance < required_amount:
                     shortage = required_amount - balance
-                    recharge_amount = shortage + 1  # 补差价 + 1u 余量
+                    # 向上取整（源机器人只接受整数充值）
+                    import math
+                    recharge_amount = math.ceil(shortage + 1)  # 补差价 + 1u，向上取整
                     
                     print(f'⚠️ 余额不足！需要: ${required_amount:.2f}, 当前: ${balance:.2f}')
-                    print(f'💰 自动充值 ${recharge_amount:.2f}...')
+                    print(f'💰 自动充值 ${recharge_amount} (整数)...')
                     
                     try:
                         await self.auto_recharge(recharge_amount)
@@ -289,13 +291,25 @@ class AutoPurchaser:
         msgs = await self.client.get_messages(Config.SOURCE_BOT, limit=1)
         
         if msgs and msgs[0].text:
-            # 解析余额（格式：💰 USDT: 2.87）
+            text = msgs[0].text
+            # 解析余额（格式：💰 USDT: 2.87 或 USDT:2.87）
             import re
-            match = re.search(r'USDT[:\s]+(\d+\.?\d*)', msgs[0].text)
-            if match:
-                balance = float(match.group(1))
-                print(f'💰 代购账号余额: ${balance}')
-                return balance
+            # 尝试多种模式
+            patterns = [
+                r'USDT[:\s]+(\d+\.?\d*)',  # 💰 USDT: 2.87
+                r'余额[:\s]+(\d+\.?\d*)',  # 余额: 2.87
+                r'(\d+\.?\d*)\s*USDT',     # 2.87 USDT
+            ]
+            
+            for pattern in patterns:
+                match = re.search(pattern, text)
+                if match:
+                    balance = float(match.group(1))
+                    print(f'💰 代购账号余额: ${balance}')
+                    return balance
+            
+            # 无法解析，打印原始文本用于调试
+            print(f'⚠️ 无法解析余额，原始文本:\n{text[:200]}')
         
         # 无法获取余额时返回 0
         print('⚠️ 无法解析余额，返回 0')
@@ -303,7 +317,9 @@ class AutoPurchaser:
     
     async def auto_recharge(self, amount):
         """通过源机器人自动充值（OKPay）"""
-        print(f'💰 开始自动充值 ${amount:.2f}...')
+        # 确保金额是整数
+        amount = int(amount)
+        print(f'💰 开始自动充值 ${amount}...')
         
         # 1. 返回主菜单
         await self.client.send_message(Config.SOURCE_BOT, '🏠主菜单')
