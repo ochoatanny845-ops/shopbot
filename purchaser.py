@@ -308,7 +308,15 @@ class AutoPurchaser:
                     print(f'💰 代购账号余额: ${balance}')
                     return balance
             
-            # 无法解析，打印原始文本用于调试
+            # 无法解析时，打印十六进制调试
+            import binascii
+            # 查找 USDT 所在行
+            for line in text.split('\n'):
+                if 'USDT' in line:
+                    print(f'⚠️ USDT 行原始内容: {repr(line)}')
+                    print(f'   十六进制: {binascii.hexlify(line.encode()).decode()}')
+                    break
+            
             print(f'⚠️ 无法解析余额，原始文本:\n{text[:200]}')
         
         # 无法获取余额时返回 0
