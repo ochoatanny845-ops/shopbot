@@ -68,6 +68,25 @@ class AutoPurchaser:
                 os.makedirs(user_dir, exist_ok=True)
                 print(f'📁 文件保存路径: {user_dir}')
                 
+                # ✅ 检查余额并自动充值
+                balance = await self.check_balance()
+                required_amount = price * quantity
+                
+                if balance < required_amount:
+                    shortage = required_amount - balance
+                    recharge_amount = shortage + 1  # 补差价 + 1u 余量
+                    
+                    print(f'⚠️ 余额不足！需要: ${required_amount:.2f}, 当前: ${balance:.2f}')
+                    print(f'💰 自动充值 ${recharge_amount:.2f}...')
+                    
+                    try:
+                        await self.auto_recharge(recharge_amount)
+                        print('✅ 充值成功，继续购买')
+                    except Exception as e:
+                        raise Exception(f'自动充值失败: {e}\n请手动充值后重试')
+                else:
+                    print(f'✅ 余额充足 (需要: ${required_amount:.2f}, 余额: ${balance:.2f})')
+                
                 # 记录购买前的最后消息ID（用于隔离）
                 msgs = await self.client.get_messages(Config.SOURCE_BOT, limit=1)
                 last_msg_id = msgs[0].id if msgs else 0
@@ -259,6 +278,129 @@ class AutoPurchaser:
             await asyncio.sleep(2)
         
         return files
+    
+    async def check_balance(self):
+        """查询代购账号余额"""
+        # 发送主菜单命令
+        await self.client.send_message(Config.SOURCE_BOT, '🏠主菜单')
+        await asyncio.sleep(2)
+        
+        # 获取最新消息
+        msgs = await self.client.get_messages(Config.SOURCE_BOT, limit=1)
+        
+        if msgs and msgs[0].text:
+            # 解析余额（格式：💰 USDT: 2.87）
+            import re
+            match = re.search(r'USDT[:\s]+(\d+\.?\d*)', msgs[0].text)
+            if match:
+                balance = float(match.group(1))
+                print(f'💰 代购账号余额: ${balance}')
+                return balance
+        
+        # 无法获取余额时返回 0
+        print('⚠️ 无法解析余额，返回 0')
+        return 0
+    
+    async def auto_recharge(self, amount):
+        """通过源机器人自动充值（OKPay）"""
+        print(f'💰 开始自动充值 ${amount:.2f}...')
+        
+        # 1. 返回主菜单
+        await self.client.send_message(Config.SOURCE_BOT, '🏠主菜单')
+        await asyncio.sleep(2)
+        
+        # 2. 点击"充值余额"
+        msgs = await self.client.get_messages(Config.SOURCE_BOT, limit=1)
+        if msgs and msgs[0].buttons:
+            clicked = False
+            for row in msgs[0].buttons:
+                for btn in row:
+                    if '充值' in btn.text:
+                        await btn.click()
+                        await asyncio.sleep(2)
+                        print('  ✅ 已点击"充值余额"')
+                        clicked = True
+                        break
+                if clicked:
+                    break
+            
+            if not clicked:
+                raise Exception('未找到"充值余额"按钮')
+        
+        # 3. 点击"自定义金额"
+        msgs = await self.client.get_messages(Config.SOURCE_BOT, limit=1)
+        if msgs and msgs[0].buttons:
+            clicked = False
+            for row in msgs[0].buttons:
+                for btn in row:
+                    if '自定义' in btn.text:
+                        await btn.click()
+                        await asyncio.sleep(2)
+                        print('  ✅ 已点击"自定义金额"')
+                        clicked = True
+                        break
+                if clicked:
+                    break
+            
+            if not clicked:
+                raise Exception('未找到"自定义金额"按钮')
+        
+        # 4. 输入金额
+        await self.client.send_message(Config.SOURCE_BOT, str(amount))
+        await asyncio.sleep(2)
+        print(f'  ✅ 已输入金额: {amount}')
+        
+        # 5. 点击"付款"
+        msgs = await self.client.get_messages(Config.SOURCE_BOT, limit=1)
+        if msgs and msgs[0].buttons:
+            clicked = False
+            for row in msgs[0].buttons:
+                for btn in row:
+                    if '付款' in btn.text or 'Pay' in btn.text:
+                        await btn.click()
+                        await asyncio.sleep(3)
+                        print('  ✅ 已点击"付款"')
+                        clicked = True
+                        break
+                if clicked:
+                    break
+            
+            if not clicked:
+                raise Exception('未找到"付款"按钮')
+        
+        # 6. 点击"确认支付"（OKPay 支付确认）
+        msgs = await self.client.get_messages(Config.SOURCE_BOT, limit=1)
+        if msgs and msgs[0].buttons:
+            clicked = False
+            for row in msgs[0].buttons:
+                for btn in row:
+                    # 查找"确认支付"按钮
+                    if '确认' in btn.text or 'Confirm' in btn.text or '✓' in btn.text:
+                        await btn.click()
+                        await asyncio.sleep(3)
+                        print('  ✅ 已点击"确认支付"')
+                        clicked = True
+                        break
+                if clicked:
+                    break
+            
+            if not clicked:
+                raise Exception('未找到"确认支付"按钮')
+        
+        # 7. 等待余额更新（轮询源机器人余额）
+        print('  ⏳ 等待余额更新...')
+        old_balance = await self.check_balance()
+        
+        for i in range(15):  # 最多等待 30 秒
+            await asyncio.sleep(2)
+            new_balance = await self.check_balance()
+            
+            # 检查余额是否增加
+            if new_balance > old_balance:
+                print(f'✅ 充值成功！余额: ${old_balance} → ${new_balance}')
+                return True
+        
+        raise Exception('充值超时，余额未更新')
     
     async def stop(self):
         """停止客户端"""
