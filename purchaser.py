@@ -448,21 +448,35 @@ class AutoPurchaser:
         
         # 8. 等待余额更新（监听到账提醒，不刷主菜单）
         print('  ⏳ 等待充值到账（最多 150 秒）...')
+        old_balance = await self.check_balance()
         
         # 最多等待 150 秒（2.5 分钟），每 10 秒检查一次消息
         for i in range(15):
             await asyncio.sleep(10)
             
-            # 检查是否有到账提醒消息
+            # 检查是否有到账提醒消息（必须包含"到账提醒"或"账户余额"）
             msgs = await self.client.get_messages(Config.SOURCE_BOT, limit=5)
             for msg in msgs:
-                if msg.text and ('到账' in msg.text or '充值成功' in msg.text or '✅ 充值' in msg.text):
-                    print(f'  ✅ 检测到到账提醒: {msg.text[:50]}...')
-                    # 检测到到账提醒后，直接返回成功，不再刷主菜单
-                    print('✅ 充值成功（到账提醒已确认）')
-                    return True
+                msg_text = msg.message if hasattr(msg, 'message') else (msg.text or '')
+                
+                # 严格检测到账提醒（必须包含"到账"或"账户余额"）
+                if ('到账提醒' in msg_text or '账户余额' in msg_text) and 'USDT' in msg_text:
+                    print(f'  ✅ 检测到到账提醒: {msg_text[:80]}...')
+                    
+                    # 确认余额是否真的增加了
+                    new_balance = await self.check_balance()
+                    if new_balance > old_balance:
+                        print(f'✅ 充值成功！余额: ${old_balance} → ${new_balance}')
+                        return True
+                    else:
+                        print(f'  ⚠️ 余额未增加，继续等待... (当前: ${new_balance})')
+                
+                # 检测充值失败消息
+                if '余额不足' in msg_text or '操作失败' in msg_text:
+                    print(f'  ❌ 检测到充值失败: {msg_text[:80]}...')
+                    raise Exception('充值失败：OKPay 钱包余额不足')
             
-            # 打印等待进度（不检查余额，避免刷主菜单）
+            # 打印等待进度
             if i % 3 == 0:
                 print(f'  ⏳ 等待中... ({(i+1)*10}秒 / 150秒)')
         
