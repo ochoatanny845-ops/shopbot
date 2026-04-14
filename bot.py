@@ -15,16 +15,33 @@ class SalesBot:
         self.purchaser = purchaser
         self.app = None
     
-    def start_bot(self):
-        """启动机器人"""
+    def build_app(self):
+        """构建应用（不启动）"""
         self.app = Application.builder().token(Config.BOT_TOKEN).build()
         
         # 注册处理器
         self.app.add_handler(CommandHandler("start", self.cmd_start))
         self.app.add_handler(CallbackQueryHandler(self.handle_callback))
         
-        print(f'✅ 销售机器人启动: @{Config.BOT_USERNAME}')
-        self.app.run_polling()
+        print(f'✅ 销售机器人已构建: @{Config.BOT_USERNAME}')
+        return self.app
+    
+    async def start(self):
+        """启动机器人（异步方式）"""
+        if self.app is None:
+            self.build_app()
+        
+        await self.app.initialize()
+        await self.app.start()
+        await self.app.updater.start_polling()
+        print(f'✅ 销售机器人已启动: @{Config.BOT_USERNAME}')
+    
+    async def stop(self):
+        """停止机器人"""
+        if self.app:
+            await self.app.updater.stop()
+            await self.app.stop()
+            await self.app.shutdown()
     
     async def cmd_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """处理 /start 命令"""

@@ -54,14 +54,23 @@ async def main():
     # 启动定时同步（后台任务）
     asyncio.create_task(sync_products_loop(scraper))
     
-    # 启动销售机器人（阻塞）
+    # 启动销售机器人（异步方式）
     sales_bot = SalesBot(purchaser)
+    await sales_bot.start()
     
     print('\n✅ 系统启动完成！')
     print('='*60)
+    print('💡 按 Ctrl+C 退出系统')
+    print('='*60)
     
-    # 机器人会阻塞在这里
-    sales_bot.start_bot()
+    # 保持运行
+    try:
+        await asyncio.Event().wait()  # 永久等待，直到收到停止信号
+    except KeyboardInterrupt:
+        print('\n⚠️ 正在关闭系统...')
+        await sales_bot.stop()
+        await ClientManager.disconnect()
+        print('✅ 系统已关闭')
 
 if __name__ == '__main__':
     asyncio.run(main())
