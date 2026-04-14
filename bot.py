@@ -612,10 +612,18 @@ class SalesBot:
         conn = self.db.get_connection()
         c = conn.cursor()
         
+        # 使用 INSERT OR IGNORE 避免覆盖余额
         c.execute('''
-            INSERT OR REPLACE INTO users (user_id, username, first_name, last_name, last_activity)
+            INSERT OR IGNORE INTO users (user_id, username, first_name, last_name, last_activity)
             VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
         ''', (user.id, user.username, user.first_name, user.last_name))
+        
+        # 如果用户已存在，只更新活跃时间和用户名
+        c.execute('''
+            UPDATE users 
+            SET username = ?, first_name = ?, last_name = ?, last_activity = CURRENT_TIMESTAMP
+            WHERE user_id = ?
+        ''', (user.username, user.first_name, user.last_name, user.id))
         
         conn.commit()
         conn.close()
