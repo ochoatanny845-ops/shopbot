@@ -363,47 +363,75 @@ class AutoPurchaser:
         
         # 4. 输入金额
         await self.client.send_message(Config.SOURCE_BOT, str(amount))
-        await asyncio.sleep(2)
+        await asyncio.sleep(3)
         print(f'  ✅ 已输入金额: {amount}')
         
-        # 5. 点击"付款"
+        # 5. 提取支付链接并打开
         msgs = await self.client.get_messages(Config.SOURCE_BOT, limit=1)
-        if msgs and msgs[0].buttons:
-            clicked = False
-            for row in msgs[0].buttons:
-                for btn in row:
-                    if '付款' in btn.text or 'Pay' in btn.text:
-                        await btn.click()
-                        await asyncio.sleep(3)
-                        print('  ✅ 已点击"付款"')
-                        clicked = True
-                        break
-                if clicked:
-                    break
-            
-            if not clicked:
-                raise Exception('未找到"付款"按钮')
+        payment_url = None
         
-        # 6. 点击"确认支付"（OKPay 支付确认）
-        msgs = await self.client.get_messages(Config.SOURCE_BOT, limit=1)
+        if msgs and msgs[0].text and msgs[0].entities:
+            from telethon.tl.types import MessageEntityTextUrl, MessageEntityUrl
+            
+            for entity in msgs[0].entities:
+                if isinstance(entity, MessageEntityTextUrl):
+                    # 文本超链接（"点击付款"）
+                    payment_url = entity.url
+                    print(f'  ✅ 找到支付链接: {payment_url}')
+                    break
+                elif isinstance(entity, MessageEntityUrl):
+                    # 普通 URL
+                    offset = entity.offset
+                    length = entity.length
+                    payment_url = msgs[0].text[offset:offset+length]
+                    print(f'  ✅ 找到支付链接: {payment_url}')
+                    break
+        
+        if not payment_url:
+            raise Exception('未找到支付链接')
+        
+        # 6. 打开支付链接（如果是 t.me/okpaybot 开头）
+        # Telethon 会自动处理深链接
+        if 'okpaybot' in payment_url or 't.me' in payment_url:
+            print('  ✅ 正在打开 OKPay 支付页面...')
+            
+            # 方法1：直接通过 start 参数打开（推荐）
+            import re
+            # 提取 start 参数（例如：t.me/okpaybot?start=xxx）
+            start_match = re.search(r'start=([^&]+)', payment_url)
+            if start_match:
+                start_param = start_match.group(1)
+                await self.client.send_message('@okpaybot', f'/start {start_param}')
+            else:
+                # 没有 start 参数，直接发送链接
+                await self.client.send_message('@okpaybot', '/start')
+            
+            await asyncio.sleep(3)
+        else:
+            print(f'  ⚠️ 未知的支付链接格式: {payment_url}')
+        
+        # 7. 点击"确认支付"（在 OKPay Bot 中）
+        msgs = await self.client.get_messages('@okpaybot', limit=1)
         if msgs and msgs[0].buttons:
             clicked = False
             for row in msgs[0].buttons:
                 for btn in row:
                     # 查找"确认支付"按钮
-                    if '确认' in btn.text or 'Confirm' in btn.text or '✓' in btn.text:
+                    if '确认' in btn.text or 'Confirm' in btn.text or '✓' in btn.text or '支付' in btn.text:
                         await btn.click()
                         await asyncio.sleep(3)
-                        print('  ✅ 已点击"确认支付"')
+                        print('  ✅ 已点击"确认支付"（OKPay）')
                         clicked = True
                         break
                 if clicked:
                     break
             
             if not clicked:
-                raise Exception('未找到"确认支付"按钮')
+                raise Exception('未找到"确认支付"按钮（OKPay）')
+        else:
+            raise Exception('OKPay Bot 未返回按钮')
         
-        # 7. 等待余额更新（轮询源机器人余额）
+        # 8. 等待余额更新（轮询源机器人余额）
         print('  ⏳ 等待余额更新...')
         old_balance = await self.check_balance()
         
