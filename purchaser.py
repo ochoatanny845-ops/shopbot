@@ -431,35 +431,27 @@ class AutoPurchaser:
         else:
             raise Exception('OKPay Bot 未返回按钮')
         
-        # 8. 等待余额更新（监听到账提醒 + 定期检查）
+        # 8. 等待余额更新（监听到账提醒，不刷主菜单）
         print('  ⏳ 等待充值到账（最多 150 秒）...')
-        old_balance = await self.check_balance()
         
-        # 最多等待 150 秒（2.5 分钟），每 10 秒检查一次
+        # 最多等待 150 秒（2.5 分钟），每 10 秒检查一次消息
         for i in range(15):
             await asyncio.sleep(10)
             
-            # 方法1：检查是否有到账提醒消息
+            # 检查是否有到账提醒消息
             msgs = await self.client.get_messages(Config.SOURCE_BOT, limit=5)
             for msg in msgs:
                 if msg.text and ('到账' in msg.text or '充值成功' in msg.text or '✅ 充值' in msg.text):
                     print(f'  ✅ 检测到到账提醒: {msg.text[:50]}...')
-                    # 确认余额
-                    new_balance = await self.check_balance()
-                    if new_balance > old_balance:
-                        print(f'✅ 充值成功！余额: ${old_balance} → ${new_balance}')
-                        return True
-            
-            # 方法2：直接检查余额（避免频繁刷新主菜单）
-            if i % 2 == 0:  # 每 20 秒检查一次余额
-                new_balance = await self.check_balance()
-                if new_balance > old_balance:
-                    print(f'✅ 充值成功！余额: ${old_balance} → ${new_balance}')
+                    # 检测到到账提醒后，直接返回成功，不再刷主菜单
+                    print('✅ 充值成功（到账提醒已确认）')
                     return True
-                else:
-                    print(f'  ⏳ 第 {i+1}/15 次检查，余额: ${new_balance} (等待中...)')
+            
+            # 打印等待进度（不检查余额，避免刷主菜单）
+            if i % 3 == 0:
+                print(f'  ⏳ 等待中... ({(i+1)*10}秒 / 150秒)')
         
-        raise Exception('充值超时（150秒），余额未更新')
+        raise Exception('充值超时（150秒），未检测到到账提醒')
     
     async def stop(self):
         """停止客户端"""
