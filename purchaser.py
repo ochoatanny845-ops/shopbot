@@ -167,16 +167,17 @@ class AutoPurchaser:
     
     async def _navigate_to_category_for_bot(self, bot, category):
         """导航到分类（支持指定 bot）"""
-        # 发送 🏠主菜单 回到主页
-        await self.client.send_message(bot, '🏠主菜单')
+        # 发送 /start 回到主页
+        await self.client.send_message(bot, '/start')
         await asyncio.sleep(2)
         
-        # 点击"账号列表"
+        # 点击"商品分类"或"账号列表"
         msgs = await self.client.get_messages(bot, limit=1)
         if msgs and msgs[0].buttons:
             for row in msgs[0].buttons:
                 for btn in row:
-                    if '账号列表' in btn.text or '🛒' in btn.text:
+                    # @SanJianbot 用 "商品分类"，@hao24bot 用 "账号列表"
+                    if '商品分类' in btn.text or '账号列表' in btn.text or '🛒' in btn.text:
                         await btn.click()
                         await asyncio.sleep(2)
                         break
@@ -234,6 +235,7 @@ class AutoPurchaser:
         if msgs and msgs[0].buttons:
             for row in msgs[0].buttons:
                 for btn in row:
+                    # @SanJianbot 用 "确认购买 ✅"，@hao24bot 用 "确认"
                     if '确认' in btn.text or '✅' in btn.text:
                         await btn.click()
                         await asyncio.sleep(2)
@@ -255,21 +257,26 @@ class AutoPurchaser:
                 if msg.media and hasattr(msg.media, 'document'):
                     filename = msg.file.name or f'file_{msg.id}'
                     
+                    # 跳过视频文件
                     if filename.endswith('.mp4'):
                         continue
                     
+                    # 只接收 .txt 和 .zip 文件
                     if not (filename.endswith('.txt') or filename.endswith('.zip')):
                         continue
                     
                     filepath = os.path.join(save_dir, filename)
                     
+                    # 避免重复下载
                     if any(f['path'] == filepath for f in files):
                         continue
                     
                     await self.client.download_media(msg, filepath)
                     files.append({'path': filepath, 'name': filename})
             
-            if len(files) >= 3:
+            # @SanJianbot 只发送 1 个 zip 文件
+            # @hao24bot 发送 3 个文件（txt + zip）
+            if len(files) >= 1:
                 break
             
             await asyncio.sleep(5)
@@ -281,13 +288,17 @@ class AutoPurchaser:
     
     async def _check_balance_for_bot(self, bot):
         """检查余额（支持指定 bot）"""
-        await self.client.send_message(bot, '🏠主菜单')
+        # 发送 /start 回到主页
+        await self.client.send_message(bot, '/start')
         await asyncio.sleep(2)
         
         msgs = await self.client.get_messages(bot, limit=1)
         if msgs and msgs[0].text:
             import re
-            match = re.search(r'余额[：:]\s*\$?(\d+\.?\d*)', msgs[0].text)
+            # 支持多种余额格式
+            # @hao24bot: "余额：$42.3"
+            # @SanJianbot: "您的余额: 42.3 USDT" 或 "余额: 42.3 USDT"
+            match = re.search(r'(?:余额|剩余金额)[：:]\s*\$?(\d+\.?\d*)\s*(?:USDT)?', msgs[0].text, re.IGNORECASE)
             if match:
                 return float(match.group(1))
         

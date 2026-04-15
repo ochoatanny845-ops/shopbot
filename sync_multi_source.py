@@ -49,14 +49,15 @@ class MultiSourceScraper:
             await client.send_message(source_bot, '/start')
             await asyncio.sleep(2)
             
-            # 点击"账号列表"
+            # 点击"商品分类"或"账号列表"
             msgs = await client.get_messages(source_bot, limit=1)
             if not msgs or not msgs[0].buttons:
-                raise Exception('未找到账号列表按钮')
+                raise Exception('未找到商品入口按钮')
             
             for row in msgs[0].buttons:
                 for btn in row:
-                    if '账号列表' in btn.text or '🛒' in btn.text:
+                    # @SanJianbot 用 "商品分类"，@hao24bot 用 "账号列表"
+                    if '商品分类' in btn.text or '账号列表' in btn.text or '🛒' in btn.text:
                         await btn.click()
                         await asyncio.sleep(2)
                         break
@@ -99,15 +100,15 @@ class MultiSourceScraper:
     async def _scrape_category(self, client, source_bot, category):
         """抓取单个分类的商品"""
         # 返回主菜单
-        await client.send_message(source_bot, '🏠主菜单')
+        await client.send_message(source_bot, '/start')
         await asyncio.sleep(2)
         
-        # 点击账号列表
+        # 点击商品分类或账号列表
         msgs = await client.get_messages(source_bot, limit=1)
         if msgs and msgs[0].buttons:
             for row in msgs[0].buttons:
                 for btn in row:
-                    if '账号列表' in btn.text or '🛒' in btn.text:
+                    if '商品分类' in btn.text or '账号列表' in btn.text or '🛒' in btn.text:
                         await btn.click()
                         await asyncio.sleep(2)
                         break
@@ -139,14 +140,26 @@ class MultiSourceScraper:
     
     def _parse_product(self, category, text, button_data):
         """解析商品信息"""
-        # 示例格式: "美国 【100】- $0.15"
-        match = re.search(r'(.+?)\s*【(\d+)】.*?\$(\d+\.?\d*)', text)
-        if not match:
-            return None
+        # @hao24bot 格式: "美国 【100】- $0.15"
+        # @SanJianbot 格式: "🇬🇧 德国+49 [1.35U] 数量 (947)"
         
-        name = match.group(1).strip()
-        stock = int(match.group(2))
-        price = float(match.group(3))
+        # 尝试匹配 @hao24bot 格式
+        match = re.search(r'(.+?)\s*【(\d+)】.*?\$(\d+\.?\d*)', text)
+        if match:
+            name = match.group(1).strip()
+            stock = int(match.group(2))
+            price = float(match.group(3))
+        else:
+            # 尝试匹配 @SanJianbot 格式
+            match = re.search(r'(.+?)\s*\[(\d+\.?\d*)U\]\s*数量\s*\((\d+)\)', text)
+            if not match:
+                return None
+            
+            name = match.group(1).strip()
+            # 移除emoji（如 🇬🇧）
+            name = re.sub(r'[\U0001F1E6-\U0001F1FF]+', '', name).strip()
+            price = float(match.group(2))
+            stock = int(match.group(3))
         
         # 计算售价
         selling_price = round(price + Config.MARKUP_FIXED, 2)
