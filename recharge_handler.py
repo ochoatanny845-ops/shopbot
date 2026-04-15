@@ -166,7 +166,7 @@ class RechargeHandler:
         c = conn.cursor()
         
         c.execute('''
-            SELECT id, amount FROM recharge_orders
+            SELECT id, amount, created_at FROM recharge_orders
             WHERE user_id = ? AND status = 'pending'
             ORDER BY created_at DESC LIMIT 1
         ''', (user_id,))
@@ -178,7 +178,7 @@ class RechargeHandler:
             conn.close()
             return
         
-        order_id, expected_amount = order
+        order_id, expected_amount, order_created_at = order
         
         # 检查 TxID 是否已被使用
         c.execute('SELECT id FROM recharge_orders WHERE txid = ?', (txid,))
@@ -234,8 +234,43 @@ class RechargeHandler:
                 break
         
         if result['success']:
-            # 验证通过，入账
+            # ✅ 验证通过，但还需要检查交易时间
             actual_amount = result['amount']
+            tx_timestamp = result.get('timestamp', 0)
+            
+            # 将订单创建时间转为时间戳
+            from datetime import datetime
+            order_time = datetime.fromisoformat(order_created_at).timestamp()
+            
+            # 计算时间差（秒）
+            time_diff = tx_timestamp - order_time
+            
+            # 🛡️ 安全检查：交易必须在订单创建后 10 分钟内
+            # 允许负值（订单创建前几分钟的交易也可接受，考虑时钟偏差）
+            if time_diff < -600:  # 订单创建前 10 分钟
+                await msg.edit_text(
+                    f'❌ **安全验证失败**\n\n'
+                    f'此交易发生在充值订单创建之前！\n\n'
+                    f'订单创建时间：{order_created_at}\n'
+                    f'交易时间：{datetime.fromtimestamp(tx_timestamp).isoformat()}\n'
+                    f'时间差：{abs(time_diff) / 60:.1f} 分钟\n\n'
+                    f'⚠️ 不允许使用历史交易充值\n'
+                    f'请使用新的转账交易',
+                    parse_mode='Markdown'
+                )
+                return
+            
+            if time_diff > 1800:  # 订单创建后 30 分钟
+                await msg.edit_text(
+                    f'⏰ **订单已超时**\n\n'
+                    f'订单创建时间：{order_created_at}\n'
+                    f'交易时间：{datetime.fromtimestamp(tx_timestamp).isoformat()}\n'
+                    f'时间差：{time_diff / 60:.1f} 分钟\n\n'
+                    f'⚠️ 充值订单有效期：30 分钟\n'
+                    f'请重新发起充值',
+                    parse_mode='Markdown'
+                )
+                return
             
             # 更新订单状态
             conn = self.db.get_connection()
