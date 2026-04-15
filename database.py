@@ -121,8 +121,10 @@ class Database:
             CREATE TABLE IF NOT EXISTS okpay_orders (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL,
-                order_no TEXT UNIQUE NOT NULL,
+                unique_id TEXT UNIQUE NOT NULL,
+                order_no TEXT,
                 amount REAL NOT NULL,
+                coin TEXT DEFAULT 'USDT',
                 status TEXT DEFAULT 'pending',
                 payment_url TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
