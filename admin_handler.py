@@ -563,13 +563,14 @@ class AdminHandler:
             await query.edit_message_text(
                 '➕ **添加自定义按钮**\n\n'
                 '请发送按钮信息，格式：\n'
-                '`按钮文字|类型|内容`\n\n'
+                '```\n按钮文字---类型---内容\n```\n\n'
                 '**类型说明：**\n'
                 '• `message` - 回复消息（支持 Markdown）\n'
                 '• `url` - 跳转链接\n\n'
                 '**示例：**\n'
-                '`使用教程|message|📖 **使用教程**\\n\\n1. 第一步...`\n'
-                '`官方频道|url|https://t.me/yourchannel`',
+                '```\n使用教程---message---📖 使用教程\\n\\n1. 充值余额\\n2. 选择商品\n```\n'
+                '```\n官方频道---url---https://t.me/yourchannel\n```\n\n'
+                '⚠️ **注意：** 换行请使用 `\\\\n`（两个反斜杠+n）',
                 reply_markup=InlineKeyboardMarkup([[
                     InlineKeyboardButton("❌ 取消", callback_data='admin_custom_buttons')
                 ]]),
@@ -657,18 +658,25 @@ class AdminHandler:
         """处理添加自定义按钮输入"""
         text = update.message.text.strip()
         
-        if text.count('|') < 2:
+        # 支持两种分隔符：--- 或 |
+        separator = '---' if '---' in text else '|'
+        
+        if text.count(separator) < 2:
             await update.message.reply_text(
                 '❌ 格式错误！\n\n'
-                '正确格式：`按钮文字|类型|内容`',
+                '正确格式：`按钮文字---类型---内容`\n'
+                '或：`按钮文字|类型|内容`',
                 parse_mode='Markdown'
             )
             return
         
-        parts = text.split('|', 2)
+        parts = text.split(separator, 2)
         btn_text = parts[0].strip()
         btn_type = parts[1].strip()
         btn_content = parts[2].strip()
+        
+        # 处理 \n 转义（将 \\n 转换为真正的换行）
+        btn_content = btn_content.replace('\\n', '\n')
         
         if btn_type not in ['message', 'url']:
             await update.message.reply_text('❌ 类型必须是 `message` 或 `url`', parse_mode='Markdown')
@@ -681,7 +689,7 @@ class AdminHandler:
             f'✅ **按钮已添加**\n\n'
             f'按钮文字：{btn_text}\n'
             f'类型：{btn_type}\n'
-            f'内容：{btn_content[:100]}{"..." if len(btn_content) > 100 else ""}',
+            f'内容预览：\n{btn_content[:100]}{"..." if len(btn_content) > 100 else ""}',
             parse_mode='Markdown'
         )
         
