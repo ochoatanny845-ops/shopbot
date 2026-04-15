@@ -136,13 +136,20 @@ class MultiSourceScraper:
                 for btn in row:
                     if category in btn.text:
                         await btn.click()
-                        await asyncio.sleep(2)
+                        await asyncio.sleep(3)  # 等待页面加载
                         break
         
         # 获取商品列表
         msgs = await client.get_messages(source_bot, limit=1)
         if not msgs or not msgs[0].buttons:
+            print(f'         ⚠️ 未找到按钮')
             return []
+        
+        # 🔍 调试：打印所有按钮
+        print(f'         📋 页面按钮：')
+        for row in msgs[0].buttons:
+            for btn in row:
+                print(f'            - {btn.text}')
         
         products = []
         for row in msgs[0].buttons:
@@ -151,6 +158,8 @@ class MultiSourceScraper:
                     product = self._parse_product(category, btn.text, btn.data)
                     if product:
                         products.append(product)
+                    else:
+                        print(f'         ⚠️ 无法解析: {btn.text}')
         
         # 点击返回按钮回到分类列表
         msgs = await client.get_messages(source_bot, limit=1)
