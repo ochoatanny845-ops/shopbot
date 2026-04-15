@@ -53,12 +53,16 @@ class RechargeHandler:
         # 设置用户状态：等待输入金额
         context.user_data['waiting_for'] = 'recharge_amount'
         
-        await query.edit_message_text(
+        # 发送提示并保存消息 ID
+        amount_prompt = await query.edit_message_text(
             '💰 **请输入充值金额**\n\n'
             '⚠️ 最低充值：1 USDT\n'
             '⚠️ 请输入数字，例如：10',
             parse_mode='Markdown'
         )
+        
+        # 保存"请输入充值金额"消息 ID
+        context.user_data['amount_prompt_message_id'] = amount_prompt.message_id
     
     async def handle_amount_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """处理用户输入的金额"""
@@ -81,11 +85,20 @@ class RechargeHandler:
             # 生成支付信息并记录消息 ID
             message_ids = await self._send_payment_info(update, amount, order_id)
             
+            # 🗑️ 将"请输入充值金额"提示和用户的金额消息也加入删除列表
+            amount_prompt_id = context.user_data.get('amount_prompt_message_id')
+            if amount_prompt_id:
+                message_ids.insert(0, amount_prompt_id)  # 添加到列表开头
+            
+            message_ids.insert(1, update.message.message_id)  # 添加用户的金额消息
+            
             # 保存消息 ID 到 context，用于后续删除
             context.user_data[f'recharge_messages_{order_id}'] = message_ids
             
-            # 清除状态
+            # 清除状态和临时数据
             context.user_data['waiting_for'] = None
+            if 'amount_prompt_message_id' in context.user_data:
+                del context.user_data['amount_prompt_message_id']
             
         except ValueError:
             await update.message.reply_text('❌ 请输入有效的数字，例如：10')
