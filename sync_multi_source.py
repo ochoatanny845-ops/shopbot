@@ -124,8 +124,15 @@ class MultiSourceScraper:
     
     async def _scrape_category(self, client, source_bot, purchaser, category):
         """抓取单个分类的商品"""
-        # 使用购买器导航到分类
-        await purchaser.navigate_to_category(category)
+        # 点击分类按钮（假设当前在分类列表页面）
+        msgs = await client.get_messages(source_bot, limit=1)
+        if msgs and msgs[0].buttons:
+            for row in msgs[0].buttons:
+                for btn in row:
+                    if category in btn.text:
+                        await btn.click()
+                        await asyncio.sleep(2)
+                        break
         
         # 获取商品列表
         msgs = await client.get_messages(source_bot, limit=1)
@@ -139,6 +146,18 @@ class MultiSourceScraper:
                     product = self._parse_product(category, btn.text, btn.data)
                     if product:
                         products.append(product)
+        
+        # 点击返回按钮回到分类列表
+        msgs = await client.get_messages(source_bot, limit=1)
+        if msgs and msgs[0].buttons:
+            for row in msgs[0].buttons:
+                for btn in row:
+                    # @hao24bot 用 "返回" 或 "⬅️ 返回"
+                    # @SanJianbot 用 "🔄 返回分类"
+                    if '返回' in btn.text and '🏠' not in btn.text:
+                        await btn.click()
+                        await asyncio.sleep(2)
+                        break
         
         return products
     
