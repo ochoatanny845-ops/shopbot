@@ -220,10 +220,11 @@ class RechargeHandler:
                  f'有效期：10 分钟\n'
                  f'过期时间：{expire_time.strftime("%H:%M:%S")}\n\n'
                  f'💡 **操作步骤：**\n'
-                 f'1️⃣ 点击下方"💰 点击支付"按钮\n'
+                 f'1️⃣ 点击"💰 点击支付"按钮\n'
                  f'2️⃣ 在 OKPay 中完成支付\n'
-                 f'3️⃣ 支付成功后自动到账（秒到）\n\n'
-                 f'⚠️ 支付完成后会自动返回，请勿重复支付',
+                 f'3️⃣ **返回这里点击"✅ 我已支付"**\n'
+                 f'4️⃣ 系统查询订单后自动到账\n\n'
+                 f'⚠️ 支付完成后必须点击"我已支付"才能到账',
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode='Markdown'
         )
