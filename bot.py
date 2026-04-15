@@ -173,7 +173,7 @@ class SalesBot:
         balance = self._get_balance(user.id)
         
         keyboard = [
-            [InlineKeyboardButton("📱 Telegram账号", callback_data="categories")],
+            [InlineKeyboardButton("📱 Telegram账号", callback_data="show_product_overview")],
             [
                 InlineKeyboardButton("💰 充值余额", callback_data="recharge"),
                 InlineKeyboardButton("📋 我的订单", callback_data="orders")
@@ -201,7 +201,9 @@ class SalesBot:
         
         data = query.data
         
-        if data == "categories":
+        if data == "show_product_overview":
+            await self._show_product_overview(query)
+        elif data == "show_categories":
             await self._show_categories(query)
         elif data.startswith("cat_"):
             category = data[4:]
@@ -222,6 +224,37 @@ class SalesBot:
             await self._show_help(query)
         elif data == "main_menu" or data == "back_main":
             await self._back_to_main(query)
+    
+    async def _show_product_overview(self, query):
+        """显示商品总览（中间层）"""
+        # 统计总库存
+        conn = self.db.get_connection()
+        c = conn.cursor()
+        
+        c.execute('''
+            SELECT SUM(stock) as total_stock
+            FROM products
+            WHERE is_active = 1 AND stock > 0
+        ''')
+        
+        result = c.fetchone()
+        total_stock = result[0] if result and result[0] else 0
+        conn.close()
+        
+        keyboard = [
+            [InlineKeyboardButton(
+                f"TG💎直登+协议+api 百万库存 ({total_stock}个)",
+                callback_data="show_categories"
+            )],
+            [InlineKeyboardButton("🏠 返回主菜单", callback_data="back_main")]
+        ]
+        
+        await query.edit_message_text(
+            "📱 **Telegram账号商品**\n\n"
+            "请选择商品类型：",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode='Markdown'
+        )
     
     async def _show_categories(self, query):
         """显示分类列表"""
@@ -256,7 +289,7 @@ class SalesBot:
                 callback_data=f"cat_{cat}"
             )])
         
-        keyboard.append([InlineKeyboardButton("🏠 返回主菜单", callback_data="back_main")])
+        keyboard.append([InlineKeyboardButton("⬅️ 返回上级", callback_data="show_product_overview")])
         
         await query.edit_message_text(
             "📱 请选择分类：",
@@ -283,7 +316,7 @@ class SalesBot:
             await query.edit_message_text(
                 f"⚠️ 分类 {category} 暂无商品",
                 reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("⬅️ 返回分类", callback_data="categories"),
+                    InlineKeyboardButton("⬅️ 返回分类", callback_data="show_categories"),
                     InlineKeyboardButton("🏠 主菜单", callback_data="back_main")
                 ]])
             )
@@ -297,7 +330,7 @@ class SalesBot:
             )])
         
         keyboard.append([
-            InlineKeyboardButton("⬅️ 返回分类", callback_data="categories"),
+            InlineKeyboardButton("⬅️ 返回分类", callback_data="show_categories"),
             InlineKeyboardButton("🏠 主菜单", callback_data="back_main")
         ])
         
@@ -328,7 +361,7 @@ class SalesBot:
             await query.edit_message_text(
                 "❌ 商品不存在或已下架",
                 reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("⬅️ 返回分类", callback_data="categories")
+                    InlineKeyboardButton("⬅️ 返回分类", callback_data="show_categories")
                 ]])
             )
             return
@@ -339,7 +372,7 @@ class SalesBot:
             await query.edit_message_text(
                 f"❌ 商品 {name} 已售罄",
                 reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("⬅️ 返回分类", callback_data="categories")
+                    InlineKeyboardButton("⬅️ 返回分类", callback_data="show_categories")
                 ]])
             )
             return
@@ -360,7 +393,7 @@ class SalesBot:
             f"📦 库存：{stock} 个\n\n"
             f"💬 请输入购买数量（1-{stock}）：",
             reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("❌ 取消", callback_data="categories")
+                InlineKeyboardButton("❌ 取消", callback_data="show_categories")
             ]])
         )
     
@@ -642,7 +675,7 @@ class SalesBot:
         balance = self._get_balance(user.id)
         
         keyboard = [
-            [InlineKeyboardButton("📱 Telegram账号", callback_data="categories")],
+            [InlineKeyboardButton("📱 Telegram账号", callback_data="show_categories")],
             [
                 InlineKeyboardButton("💰 充值余额", callback_data="recharge"),
                 InlineKeyboardButton("📋 我的订单", callback_data="orders")
