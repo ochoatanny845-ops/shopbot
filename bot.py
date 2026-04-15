@@ -732,7 +732,7 @@ class SalesBot:
         start_message = self.db.get_setting('start_message', '👋 欢迎使用账号购买系统！\n\n🛍 请选择服务：')
         
         keyboard = [
-            [InlineKeyboardButton("📱 Telegram账号", callback_data="show_categories")],
+            [InlineKeyboardButton("📱 Telegram账号", callback_data="show_product_overview")],
             [
                 InlineKeyboardButton("💰 充值余额", callback_data="recharge"),
                 InlineKeyboardButton("📋 我的订单", callback_data="orders")
