@@ -118,12 +118,16 @@ class TRC20Recharge:
                 'Accept': 'application/json'
             }
             
+            print(f'  🔍 查询交易: {url}')
             response = requests.get(url, headers=headers, timeout=10)
+            print(f'  📡 HTTP 状态: {response.status_code}')
             
             if response.status_code != 200:
+                # 打印完整响应
+                print(f'  ❌ 响应内容: {response.text[:200]}')
                 return {
                     'success': False,
-                    'message': f'❌ 查询失败（HTTP {response.status_code}）'
+                    'message': f'❌ 查询失败（HTTP {response.status_code}）\n\n可能原因：\n1️⃣ 交易尚未上链（等待几秒后重试）\n2️⃣ TxID 复制错误\n3️⃣ API 暂时不可用\n\n请在浏览器中验证：\nhttps://tronscan.org/#/transaction/{txid}'
                 }
             
             data = response.json()
