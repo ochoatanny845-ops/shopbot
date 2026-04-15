@@ -78,8 +78,11 @@ class RechargeHandler:
             # 创建充值订单
             order_id = self._create_recharge_order(user_id, amount)
             
-            # 生成支付信息
-            await self._send_payment_info(update, amount, order_id)
+            # 生成支付信息并记录消息 ID
+            message_ids = await self._send_payment_info(update, amount, order_id)
+            
+            # 保存消息 ID 到 context，用于后续删除
+            context.user_data[f'recharge_messages_{order_id}'] = message_ids
             
             # 清除状态
             context.user_data['waiting_for'] = None
@@ -104,7 +107,9 @@ class RechargeHandler:
         return order_id
     
     async def _send_payment_info(self, update: Update, amount: float, order_id: int):
-        """发送支付信息"""
+        """发送支付信息，返回消息 ID 列表"""
+        message_ids = []  # 记录所有消息 ID，用于后续删除
+        
         # 生成二维码
         qr = qrcode.QRCode(version=1, box_size=10, border=2)
         qr.add_data(self.recipient_address)
@@ -142,14 +147,15 @@ class RechargeHandler:
         )
         
         # 发送二维码
-        await update.message.reply_photo(
+        photo_msg = await update.message.reply_photo(
             photo=bio,
             caption=message,
             parse_mode='Markdown'
         )
+        message_ids.append(photo_msg.message_id)
         
         # 提示等待 TxID
-        await update.message.reply_text(
+        tip_msg = await update.message.reply_text(
             '⏳ 请完成转账后，发送交易哈希（TxID）给我\n\n'
             f'💡 在钱包中复制交易哈希即可\n'
             f'⏰ 请在 {expire_time.strftime("%H:%M:%S")} 前提交',
@@ -157,6 +163,9 @@ class RechargeHandler:
                 InlineKeyboardButton("❌ 取消充值", callback_data=f'cancel_recharge_{order_id}')
             ]])
         )
+        message_ids.append(tip_msg.message_id)
+        
+        return message_ids  # 返回消息 ID 列表
     
     async def handle_txid_verification(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """处理用户提交的 TxID"""
@@ -330,14 +339,49 @@ class RechargeHandler:
             conn.commit()
             conn.close()
             
-            # 通知用户
-            await msg.edit_text(
-                f'✅ **充值成功！**\n\n'
-                f'订单号：#{order_id}\n'
-                f'充值金额：{actual_amount} USDT\n'
-                f'交易哈希：`{txid[:16]}...{txid[-16:]}`\n'
-                f'到账时间：{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}\n\n'
-                f'当前余额：${self._get_user_balance(user_id):.2f}',
+            # 🗑️ 删除充值流程中的临时消息
+            try:
+                # 获取保存的消息 ID
+                saved_messages = context.user_data.get(f'recharge_messages_{order_id}', [])
+                
+                # 删除订单信息和提示消息
+                for message_id in saved_messages:
+                    try:
+                        await context.bot.delete_message(
+                            chat_id=user_id,
+                            message_id=message_id
+                        )
+                    except Exception as e:
+                        print(f'  ⚠️ 删除消息失败: {e}')
+                
+                # 删除用户发送的 TxID 消息
+                try:
+                    await update.message.delete()
+                except Exception as e:
+                    print(f'  ⚠️ 删除 TxID 消息失败: {e}')
+                
+                # 删除"正在验证"消息
+                try:
+                    await msg.delete()
+                except Exception as e:
+                    print(f'  ⚠️ 删除验证消息失败: {e}')
+                
+                # 清除保存的消息 ID
+                if f'recharge_messages_{order_id}' in context.user_data:
+                    del context.user_data[f'recharge_messages_{order_id}']
+                
+            except Exception as e:
+                print(f'  ⚠️ 清理消息时出错: {e}')
+            
+            # 发送充值成功通知（新消息）
+            await context.bot.send_message(
+                chat_id=user_id,
+                text=f'✅ **充值成功！**\n\n'
+                     f'订单号：#{order_id}\n'
+                     f'充值金额：{actual_amount} USDT\n'
+                     f'交易哈希：`{txid[:16]}...{txid[-16:]}`\n'
+                     f'到账时间：{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}\n\n'
+                     f'当前余额：${self._get_user_balance(user_id):.2f}',
                 parse_mode='Markdown'
             )
         else:
