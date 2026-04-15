@@ -222,6 +222,9 @@ class SalesBot:
         elif data.startswith("cancel_okpay_"):
             order_id = int(data.split('_')[2])
             await self._cancel_okpay_recharge(query, order_id)
+        elif data.startswith("check_okpay_"):
+            # 处理 OKPay 订单查询
+            await self.recharge_handler.handle_check_okpay(update, context)
         elif data == "orders":
             await self._show_orders(query)
         elif data == "help":

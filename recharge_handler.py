@@ -208,6 +208,7 @@ class RechargeHandler:
         
         keyboard = [
             [InlineKeyboardButton("💰 点击支付", url=pay_url)],
+            [InlineKeyboardButton("✅ 我已支付", callback_data=f'check_okpay_{order_id}')],
             [InlineKeyboardButton("❌ 取消充值", callback_data=f'cancel_okpay_{order_id}')]
         ]
         
@@ -544,3 +545,118 @@ class RechargeHandler:
         conn.close()
         
         return result[0] if result else 0.0
+    
+    async def handle_check_okpay(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """处理 OKPay 订单查询（用户点击"我已支付"）"""
+        query = update.callback_query
+        await query.answer()
+        
+        # 提取订单号
+        order_id = int(query.data.split('_')[2])
+        user_id = query.from_user.id
+        
+        print(f'\n📋 用户查询 OKPay 订单')
+        print(f'  订单号: {order_id}')
+        print(f'  用户: {user_id}')
+        
+        # 查询数据库中的订单
+        conn = self.db.get_connection()
+        c = conn.cursor()
+        
+        c.execute('''
+            SELECT unique_id, amount, status
+            FROM okpay_orders
+            WHERE id = ? AND user_id = ?
+        ''', (order_id, user_id))
+        
+        order = c.fetchone()
+        conn.close()
+        
+        if not order:
+            await query.edit_message_text('❌ 订单不存在')
+            return
+        
+        unique_id, amount, status = order
+        
+        # 如果已完成，直接提示
+        if status == 'completed':
+            await query.edit_message_text(
+                f'✅ 该订单已完成！\n\n'
+                f'订单号：#{order_id}\n'
+                f'充值金额：{amount} USDT\n\n'
+                f'当前余额：${self._get_user_balance(user_id):.2f}',
+                parse_mode='Markdown'
+            )
+            return
+        
+        # 查询 OKPay 订单状态
+        await query.edit_message_text('🔍 正在查询订单状态...')
+        
+        result = self.okpay.check_deposit(unique_id)
+        
+        print(f'  查询结果: {result}')
+        
+        if result['success'] and result['status'] == 1:
+            # 已支付！更新订单和余额
+            conn = self.db.get_connection()
+            c = conn.cursor()
+            
+            # 更新订单状态
+            c.execute('''
+                UPDATE okpay_orders
+                SET status = 'completed',
+                    okpay_order_id = ?,
+                    actual_amount = ?,
+                    completed_at = ?
+                WHERE id = ?
+            ''', (result['order_id'], result['amount'], datetime.now().isoformat(), order_id))
+            
+            # 增加用户余额
+            c.execute('''
+                UPDATE users
+                SET balance = balance + ?
+                WHERE user_id = ?
+            ''', (result['amount'], user_id))
+            
+            # 记录余额日志
+            c.execute('''
+                INSERT INTO balance_logs (user_id, amount, type, note)
+                VALUES (?, ?, 'recharge', 'OKPay充值')
+            ''', (user_id, result['amount']))
+            
+            conn.commit()
+            
+            # 获取新余额
+            c.execute('SELECT balance FROM users WHERE user_id = ?', (user_id,))
+            new_balance = c.fetchone()[0]
+            
+            conn.close()
+            
+            print(f'  ✅ 充值成功！新余额: {new_balance}')
+            
+            # 通知用户
+            await query.edit_message_text(
+                f'✅ **充值成功！**\n\n'
+                f'订单号：#{order_id}\n'
+                f'充值金额：{result["amount"]} USDT\n'
+                f'到账时间：{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}\n\n'
+                f'当前余额：${new_balance:.2f}',
+                parse_mode='Markdown'
+            )
+        elif result['success'] and result['status'] == 0:
+            # 未支付
+            await query.edit_message_text(
+                f'⏳ **订单未支付**\n\n'
+                f'订单号：#{order_id}\n'
+                f'充值金额：{amount} USDT\n\n'
+                f'请先完成支付，然后再点击"我已支付"',
+                reply_markup=query.message.reply_markup  # 保留原按钮
+            )
+        else:
+            # 查询失败
+            await query.edit_message_text(
+                f'❌ **查询失败**\n\n'
+                f'{result.get("message", "未知错误")}\n\n'
+                f'请稍后重试或联系客服',
+                reply_markup=query.message.reply_markup
+            )
