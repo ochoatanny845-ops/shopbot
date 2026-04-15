@@ -6,6 +6,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 from config import Config
 from database import Database
+from recharge_handler import RechargeHandler
 
 class SalesBot:
     """销售机器人"""
@@ -15,6 +16,7 @@ class SalesBot:
         self.purchaser = purchaser
         self.app = None
         self.user_states = {}  # 用户状态管理
+        self.recharge_handler = RechargeHandler()  # 充值处理器
     
     def build_app(self):
         """构建应用（不启动）"""
@@ -23,6 +25,7 @@ class SalesBot:
         # 注册处理器
         self.app.add_handler(CommandHandler("start", self.cmd_start))
         self.app.add_handler(CommandHandler("add", self.cmd_add_balance))
+        self.app.add_handler(CommandHandler("recharge", self.cmd_recharge))  # 充值命令
         self.app.add_handler(CallbackQueryHandler(self.handle_callback))
         self.app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message))
         
@@ -187,6 +190,10 @@ class SalesBot:
             parse_mode='Markdown'
         )
     
+    async def cmd_recharge(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """处理 /recharge 充值命令"""
+        await self.recharge_handler.handle_recharge_start(update, context)
+    
     async def handle_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """处理回调查询"""
         query = update.callback_query
@@ -204,11 +211,16 @@ class SalesBot:
             await self._buy_product(query, product_id)
         elif data == "recharge":
             await self._show_recharge(query)
+        elif data == "recharge_input_amount":
+            await self.recharge_handler.handle_amount_input(update, context)
+        elif data.startswith("cancel_recharge_"):
+            order_id = int(data.split('_')[2])
+            await self._cancel_recharge(query, order_id)
         elif data == "orders":
             await self._show_orders(query)
         elif data == "help":
             await self._show_help(query)
-        elif data == "back_main":
+        elif data == "main_menu" or data == "back_main":
             await self._back_to_main(query)
     
     async def _show_categories(self, query):
@@ -353,11 +365,21 @@ class SalesBot:
         )
     
     async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """处理文本消息（用于输入购买数量）"""
+        """处理文本消息（购买数量 / 充值金额 / TxID验证）"""
         user_id = update.effective_user.id
         text = update.message.text.strip()
         
-        # 检查用户状态
+        # 优先检查是否是充值流程
+        if context.user_data.get('waiting_for') == 'recharge_amount':
+            await self.recharge_handler.handle_amount_message(update, context)
+            return
+        
+        # 检查是否是 TxID（64 位十六进制）
+        if len(text) == 64 and all(c in '0123456789abcdefABCDEF' for c in text):
+            await self.recharge_handler.handle_txid_verification(update, context)
+            return
+        
+        # 检查用户状态（购买数量输入）
         if user_id not in self.user_states:
             return
         
@@ -510,23 +532,48 @@ class SalesBot:
             )
     
     async def _show_recharge(self, query):
-        """显示充值说明"""
-        admin_link = f"tg://user?id={Config.ADMIN_IDS[0]}"
+        """显示充值说明（USDT TRC20）"""
+        keyboard = [
+            [InlineKeyboardButton("💰 输入充值金额", callback_data='recharge_input_amount')],
+            [InlineKeyboardButton("🏠 返回主菜单", callback_data='back_main')]
+        ]
         
         await query.edit_message_text(
-            "💰 充值余额\n\n"
-            "📱 联系管理员充值：\n"
-            f"   管理员ID：`{Config.ADMIN_IDS[0]}`\n\n"
-            "💡 充值后余额会自动到账\n"
-            "📊 支持的操作：\n"
-            "   • 充值（增加余额）\n"
-            "   • 扣款（减少余额）",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("💬 联系管理员", url=admin_link)],
-                [InlineKeyboardButton("🏠 返回主菜单", callback_data="back_main")]
-            ]),
+            '💰 **USDT 充值**\n\n'
+            '支持：USDT TRC20\n'
+            '到账时间：1-3 分钟\n'
+            f'最低充值：{Config.MIN_RECHARGE_AMOUNT} USDT\n\n'
+            '请点击下方按钮输入充值金额',
+            reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode='Markdown'
         )
+    
+    async def _cancel_recharge(self, query, order_id):
+        """取消充值订单"""
+        user_id = query.from_user.id
+        
+        conn = self.db.get_connection()
+        c = conn.cursor()
+        
+        c.execute('''
+            UPDATE recharge_orders
+            SET status = 'cancelled'
+            WHERE id = ? AND user_id = ? AND status = 'pending'
+        ''', (order_id, user_id))
+        
+        conn.commit()
+        affected = c.rowcount
+        conn.close()
+        
+        if affected > 0:
+            await query.edit_message_text(
+                f'✅ 已取消充值订单 #{order_id}',
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("🏠 返回主菜单", callback_data='back_main')
+                ]])
+            )
+        else:
+            await query.answer('❌ 订单不存在或已处理', show_alert=True)
     
     async def _show_orders(self, query):
         """显示订单列表"""
