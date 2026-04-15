@@ -542,14 +542,14 @@ class SalesBot:
         # 清除状态
         del self.user_states[user_id]
         
-        await update.message.reply_text(
+        processing_msg = await update.message.reply_text(
             f"⏳ 订单处理中...\n\n"
             f"🛍 商品：{state['product_name']}\n"
             f"💰 单价：${state['price']}\n"
             f"📦 数量：{quantity}\n"
             f"💵 总价：${total_price:.2f}\n"
             f"📋 订单号：{order_id}\n\n"
-            f"正在自动代购，请稍候..."
+            f"♻️正在打包检查账号存活，请耐心稍候..."
         )
         
         # 调用代购模块（传递 user_id 和 order_id 用于隔离）
@@ -571,6 +571,12 @@ class SalesBot:
             ''', (order_id,))
             conn.commit()
             conn.close()
+            
+            # 删除"订单处理中..."的消息
+            try:
+                await processing_msg.delete()
+            except:
+                pass  # 如果删除失败，忽略错误
             
             # 发送购买成功消息
             caption = (
@@ -599,6 +605,12 @@ class SalesBot:
             )
             
         except Exception as e:
+            # 删除"订单处理中..."的消息
+            try:
+                await processing_msg.delete()
+            except:
+                pass
+            
             # 退款
             conn = self.db.get_connection()
             c = conn.cursor()
