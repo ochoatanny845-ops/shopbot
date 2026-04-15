@@ -213,11 +213,15 @@ class SalesBot:
             await self._buy_product(query, product_id)
         elif data == "recharge":
             await self._show_recharge(query)
-        elif data == "recharge_input_amount":
-            await self.recharge_handler.handle_amount_input(update, context)
+        elif data.startswith("recharge_method_"):
+            method = data.split('_')[2]  # trc20 or okpay
+            await self.recharge_handler.handle_recharge_method_selection(update, context, method)
         elif data.startswith("cancel_recharge_"):
             order_id = int(data.split('_')[2])
             await self._cancel_recharge(query, order_id)
+        elif data.startswith("cancel_okpay_"):
+            order_id = int(data.split('_')[2])
+            await self._cancel_okpay_recharge(query, order_id)
         elif data == "orders":
             await self._show_orders(query)
         elif data == "help":
@@ -723,3 +727,16 @@ class SalesBot:
         conn.close()
         
         return result[0] if result else 0
+
+    async def _cancel_okpay_recharge(self, query, order_id):
+        user_id = query.from_user.id
+        conn = self.db.get_connection()
+        c = conn.cursor()
+        c.execute('UPDATE okpay_orders SET status = ? WHERE id = ? AND user_id = ? AND status = ?', ('cancelled', order_id, user_id, 'pending'))
+        conn.commit()
+        affected = c.rowcount
+        conn.close()
+        if affected > 0:
+            await query.edit_message_text('??? OKPay ????', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('?????', callback_data='back_main')]]))
+        else:
+            await query.answer('?????????', show_alert=True)

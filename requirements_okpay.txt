@@ -1,0 +1,4 @@
+# OKPay 充值功能依赖
+
+# Flask - HTTP 服务器（用于接收回调）
+flask

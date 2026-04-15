@@ -5,11 +5,13 @@
 import asyncio
 import qrcode
 import io
+import uuid
 from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from database import Database
 from trc20_recharge import TRC20Recharge
+from okpay_handler import OKPayHandler
 from config import Config
 
 class RechargeHandler:
@@ -23,36 +25,72 @@ class RechargeHandler:
         
         # 初始化验证器（传递 API Key）
         self.verifier = TRC20Recharge(self.recipient_address, self.api_key)
+        
+        # 初始化 OKPay 处理器
+        self.okpay = OKPayHandler() if hasattr(Config, 'OKPAY_SHOP_ID') and Config.OKPAY_SHOP_ID else None
     
     async def handle_recharge_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """处理充值请求"""
+        """处理充值请求 - 选择充值方式"""
         user_id = update.effective_user.id
         
-        # 创建充值订单（待输入金额）
-        keyboard = [
-            [InlineKeyboardButton("💰 输入充值金额", callback_data='recharge_input_amount')],
-            [InlineKeyboardButton("🔙 返回", callback_data='main_menu')]
-        ]
+        # 创建充值方式选择按钮
+        keyboard = []
+        
+        # TRC20 充值（始终可用）
+        keyboard.append([InlineKeyboardButton("💎 USDT TRC20 充值", callback_data='recharge_method_trc20')])
+        
+        # OKPay 充值（如果已配置）
+        if self.okpay:
+            keyboard.append([InlineKeyboardButton("⚡ OKPay 快速充值", callback_data='recharge_method_okpay')])
+        
+        keyboard.append([InlineKeyboardButton("🔙 返回", callback_data='main_menu')])
+        
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         await update.message.reply_text(
-            '💰 **USDT 充值**\n\n'
-            '支持：USDT TRC20\n'
-            '到账时间：1-3 分钟\n'
-            '最低充值：1 USDT\n\n'
-            '请点击下方按钮输入充值金额',
+            '💰 **选择充值方式**\n\n'
+            '💎 **USDT TRC20 充值**\n'
+            '   - 去中心化，资金直达\n'
+            '   - 到账时间：1-3 分钟\n'
+            '   - 需要复制交易哈希验证\n\n'
+            + ('⚡ **OKPay 快速充值**\n'
+               '   - 支付即到账，无需等待\n'
+               '   - 到账时间：秒到\n'
+               '   - 一键支付，自动确认\n\n' if self.okpay else '') +
+            '最低充值：1 USDT',
             reply_markup=reply_markup,
             parse_mode='Markdown'
         )
     
-    async def handle_amount_input(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """处理金额输入"""
+    async def handle_recharge_method_selection(self, update: Update, context: ContextTypes.DEFAULT_TYPE, method: str):
+        """处理充值方式选择"""
         query = update.callback_query
         await query.answer()
         
-        # 设置用户状态：等待输入金额
+        context.user_data['recharge_method'] = method
         context.user_data['waiting_for'] = 'recharge_amount'
         
+        # 发送提示并保存消息 ID
+        if method == 'trc20':
+            prompt_text = (
+                '💎 **USDT TRC20 充值**\n\n'
+                '⚠️ 最低充值：1 USDT\n'
+                '⚠️ 请输入数字，例如：10'
+            )
+        else:  # okpay
+            prompt_text = (
+                '⚡ **OKPay 快速充值**\n\n'
+                '⚠️ 最低充值：1 USDT\n'
+                '⚠️ 请输入数字，例如：10'
+            )
+        
+        amount_prompt = await query.edit_message_text(
+            prompt_text,
+            parse_mode='Markdown'
+        )
+        
+        # 保存"请输入充值金额"消息 ID
+        context.user_data['amount_prompt_message_id'] = amount_prompt.message_id
         # 发送提示并保存消息 ID
         amount_prompt = await query.edit_message_text(
             '💰 **请输入充值金额**\n\n'
@@ -79,29 +117,121 @@ class RechargeHandler:
                 await update.message.reply_text('❌ 最低充值金额为 1 USDT')
                 return
             
-            # 创建充值订单
-            order_id = self._create_recharge_order(user_id, amount)
+            # 获取充值方式
+            method = context.user_data.get('recharge_method', 'trc20')
             
-            # 生成支付信息并记录消息 ID
-            message_ids = await self._send_payment_info(update, amount, order_id)
-            
-            # 🗑️ 将"请输入充值金额"提示和用户的金额消息也加入删除列表
-            amount_prompt_id = context.user_data.get('amount_prompt_message_id')
-            if amount_prompt_id:
-                message_ids.insert(0, amount_prompt_id)  # 添加到列表开头
-            
-            message_ids.insert(1, update.message.message_id)  # 添加用户的金额消息
-            
-            # 保存消息 ID 到 context，用于后续删除
-            context.user_data[f'recharge_messages_{order_id}'] = message_ids
-            
-            # 清除状态和临时数据
-            context.user_data['waiting_for'] = None
-            if 'amount_prompt_message_id' in context.user_data:
-                del context.user_data['amount_prompt_message_id']
+            if method == 'okpay':
+                # OKPay 充值
+                await self._handle_okpay_recharge(update, context, amount)
+            else:
+                # TRC20 充值（现有逻辑）
+                await self._handle_trc20_recharge(update, context, amount)
             
         except ValueError:
             await update.message.reply_text('❌ 请输入有效的数字，例如：10')
+    
+    async def _handle_trc20_recharge(self, update: Update, context: ContextTypes.DEFAULT_TYPE, amount: float):
+        """处理 TRC20 充值"""
+        user_id = update.effective_user.id
+        
+        # 创建充值订单
+        order_id = self._create_recharge_order(user_id, amount)
+        
+        # 生成支付信息并记录消息 ID
+        message_ids = await self._send_payment_info(update, amount, order_id)
+        
+        # 🗑️ 将"请输入充值金额"提示和用户的金额消息也加入删除列表
+        amount_prompt_id = context.user_data.get('amount_prompt_message_id')
+        if amount_prompt_id:
+            message_ids.insert(0, amount_prompt_id)  # 添加到列表开头
+        
+        message_ids.insert(1, update.message.message_id)  # 添加用户的金额消息
+        
+        # 保存消息 ID 到 context，用于后续删除
+        context.user_data[f'recharge_messages_{order_id}'] = message_ids
+        
+        # 清除状态和临时数据
+        context.user_data['waiting_for'] = None
+        context.user_data['recharge_method'] = None
+        if 'amount_prompt_message_id' in context.user_data:
+            del context.user_data['amount_prompt_message_id']
+    
+    async def _handle_okpay_recharge(self, update: Update, context: ContextTypes.DEFAULT_TYPE, amount: float):
+        """处理 OKPay 充值"""
+        user_id = update.effective_user.id
+        
+        # 生成唯一订单号
+        unique_id = f"SHOP_{user_id}_{int(datetime.now().timestamp())}_{uuid.uuid4().hex[:8]}"
+        
+        # 创建 OKPay 订单（数据库）
+        conn = self.db.get_connection()
+        c = conn.cursor()
+        
+        c.execute('''
+            INSERT INTO okpay_orders (user_id, unique_id, amount, coin, status, created_at)
+            VALUES (?, ?, ?, 'USDT', 'pending', ?)
+        ''', (user_id, unique_id, amount, datetime.now().isoformat()))
+        
+        order_id = c.lastrowid
+        conn.commit()
+        conn.close()
+        
+        # 调用 OKPay API 创建支付链接
+        result = self.okpay.create_payment_link(unique_id, amount)
+        
+        if not result['success']:
+            await update.message.reply_text(
+                f'❌ 创建支付链接失败\n\n'
+                f'{result["message"]}\n\n'
+                f'请稍后重试或联系客服'
+            )
+            return
+        
+        pay_url = result['pay_url']
+        
+        # 删除输入提示和用户金额消息
+        amount_prompt_id = context.user_data.get('amount_prompt_message_id')
+        if amount_prompt_id:
+            try:
+                await context.bot.delete_message(chat_id=user_id, message_id=amount_prompt_id)
+            except:
+                pass
+        
+        try:
+            await update.message.delete()
+        except:
+            pass
+        
+        # 发送支付链接
+        from datetime import timedelta
+        expire_time = datetime.now() + timedelta(minutes=10)
+        
+        keyboard = [
+            [InlineKeyboardButton("💰 点击支付", url=pay_url)],
+            [InlineKeyboardButton("❌ 取消充值", callback_data=f'cancel_okpay_{order_id}')]
+        ]
+        
+        await context.bot.send_message(
+            chat_id=user_id,
+            text=f'⚡ **OKPay 充值订单**\n\n'
+                 f'订单号：#{order_id}\n'
+                 f'充值金额：`{amount}` USDT\n'
+                 f'有效期：10 分钟\n'
+                 f'过期时间：{expire_time.strftime("%H:%M:%S")}\n\n'
+                 f'💡 **操作步骤：**\n'
+                 f'1️⃣ 点击下方"💰 点击支付"按钮\n'
+                 f'2️⃣ 在 OKPay 中完成支付\n'
+                 f'3️⃣ 支付成功后自动到账（秒到）\n\n'
+                 f'⚠️ 支付完成后会自动返回，请勿重复支付',
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode='Markdown'
+        )
+        
+        # 清除状态
+        context.user_data['waiting_for'] = None
+        context.user_data['recharge_method'] = None
+        if 'amount_prompt_message_id' in context.user_data:
+            del context.user_data['amount_prompt_message_id']
     
     def _create_recharge_order(self, user_id: int, amount: float) -> int:
         """创建充值订单"""

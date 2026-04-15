@@ -78,6 +78,21 @@ class Config:
     TRONGRID_API_KEY = os.getenv('TRONGRID_API_KEY', '')
     
     # ============================================
+    # OKPay 配置
+    # ============================================
+    # OKPay 商户 ID
+    OKPAY_SHOP_ID = os.getenv('OKPAY_SHOP_ID', '')
+    
+    # OKPay 商户 Token
+    OKPAY_SHOP_TOKEN = os.getenv('OKPAY_SHOP_TOKEN', '')
+    
+    # OKPay 回调服务器端口
+    OKPAY_CALLBACK_PORT = int(os.getenv('OKPAY_CALLBACK_PORT', '8888'))
+    
+    # OKPay Bot 用户名（用于返回链接）
+    OKPAY_BOT_USERNAME = os.getenv('OKPAY_BOT_USERNAME', 'TGaccbbbot')
+    
+    # ============================================
     # 日志配置
     # ============================================
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
