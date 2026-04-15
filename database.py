@@ -18,7 +18,16 @@ class Database:
     
     def get_connection(self):
         """获取数据库连接"""
-        return sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(
+            self.db_path,
+            timeout=30.0,  # 30秒超时
+            check_same_thread=False
+        )
+        # 启用 WAL 模式：支持并发读写
+        conn.execute('PRAGMA journal_mode=WAL')
+        # 设置忙等待超时
+        conn.execute('PRAGMA busy_timeout=30000')
+        return conn
     
     def init_database(self):
         """初始化数据库"""

@@ -72,9 +72,11 @@ async def main():
             from sync_multi_source import MultiSourceScraper
             scraper = MultiSourceScraper()
             await scraper.sync_all_sources()
+            print('✅ 商品同步完成')
         except Exception as e:
             print(f'⚠️ 首次同步失败: {e}')
     
+    # 先完成同步，再启动定时任务和销售机器人
     # 启动定时同步（60分钟后开始）
     asyncio.create_task(sync_products_loop())
     
