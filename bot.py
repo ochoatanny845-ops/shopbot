@@ -749,14 +749,28 @@ class SalesBot:
         return result[0] if result else 0
 
     async def _cancel_okpay_recharge(self, query, order_id):
+        """取消 OKPay 充值订单"""
         user_id = query.from_user.id
+        
         conn = self.db.get_connection()
         c = conn.cursor()
-        c.execute('UPDATE okpay_orders SET status = ? WHERE id = ? AND user_id = ? AND status = ?', ('cancelled', order_id, user_id, 'pending'))
+        
+        c.execute('''
+            UPDATE okpay_orders
+            SET status = 'cancelled'
+            WHERE id = ? AND user_id = ? AND status = 'pending'
+        ''', (order_id, user_id))
+        
         conn.commit()
         affected = c.rowcount
         conn.close()
+        
         if affected > 0:
-            await query.edit_message_text('??? OKPay ????', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('?????', callback_data='back_main')]]))
+            await query.edit_message_text(
+                f'✅ 已取消 OKPay 充值订单 #{order_id}',
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton('🏠 返回主菜单', callback_data='back_main')
+                ]])
+            )
         else:
-            await query.answer('?????????', show_alert=True)
+            await query.answer('❌ 订单不存在或已处理', show_alert=True)
