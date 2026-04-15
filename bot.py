@@ -443,7 +443,7 @@ class SalesBot:
         # 优先处理管理员输入
         admin_waiting = context.user_data.get('admin_waiting_for')
         if admin_waiting:
-            if admin_waiting in ['trc20_address', 'start_message']:
+            if admin_waiting in ['trc20_address', 'start_message', 'custom_button_text', 'custom_button_message', 'custom_button_url']:
                 handled = await self.admin_handler.handle_admin_message(update, context)
                 if handled:
                     return
