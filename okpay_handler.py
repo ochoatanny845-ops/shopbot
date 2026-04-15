@@ -40,7 +40,8 @@ class OKPayHandler:
                 'name': '账号商城充值',
                 'amount': str(amount),
                 'return_url': f'https://t.me/{self.bot_username}',
-                'coin': str(coin)
+                'coin': str(coin),
+                'callback_url': f'http://188.137.245.150:{Config.OKPAY_CALLBACK_PORT}/okpay/callback'
             }
             
             # 签名
