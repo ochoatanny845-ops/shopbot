@@ -186,6 +186,8 @@ class AdminHandler:
             await self._manage_custom_buttons(query, context)
         elif data.startswith('admin_btn_'):
             await self._handle_button_management(query, context)
+        elif data.startswith('btn_type_'):
+            await self._handle_button_type_selection(query, context)
         elif data == 'admin_back':
             # 返回管理员主菜单
             stats = self.db.get_statistics()
@@ -561,22 +563,14 @@ class AdminHandler:
         
         if data == 'admin_btn_add':
             await query.edit_message_text(
-                '➕ **添加自定义按钮**\n\n'
-                '请发送按钮信息，格式：\n'
-                '```\n按钮文字---类型---内容\n```\n\n'
-                '**类型说明：**\n'
-                '• `message` - 回复消息（支持 Markdown）\n'
-                '• `url` - 跳转链接\n\n'
-                '**示例：**\n'
-                '```\n使用教程---message---📖 使用教程\\n\\n1. 充值余额\\n2. 选择商品\n```\n'
-                '```\n官方频道---url---https://t.me/yourchannel\n```\n\n'
-                '⚠️ **注意：** 换行请使用 `\\\\n`（两个反斜杠+n）',
+                '➕ **添加自定义按钮 - 步骤 1/3**\n\n'
+                '请输入按钮文字：',
                 reply_markup=InlineKeyboardMarkup([[
                     InlineKeyboardButton("❌ 取消", callback_data='admin_custom_buttons')
-                ]]),
-                parse_mode='Markdown'
+                ]])
             )
-            context.user_data['admin_waiting_for'] = 'add_custom_button'
+            context.user_data['admin_waiting_for'] = 'custom_button_text'
+            context.user_data['custom_button_data'] = {}
         
         elif data == 'admin_btn_list':
             buttons = self.db.get_custom_buttons()
@@ -653,6 +647,129 @@ class AdminHandler:
             
             # 返回按钮列表
             await self._manage_custom_buttons(query, context)
+    
+    async def _handle_button_type_selection(self, query, context):
+        """处理按钮类型选择"""
+        btn_type = query.data.split('_')[2]  # message or url
+        
+        custom_button_data = context.user_data.get('custom_button_data', {})
+        custom_button_data['type'] = btn_type
+        context.user_data['custom_button_data'] = custom_button_data
+        
+        if btn_type == 'message':
+            await query.edit_message_text(
+                '➕ **添加自定义按钮 - 步骤 3/3**\n\n'
+                '请输入消息内容：\n\n'
+                '💡 **提示：**\n'
+                '• 支持 Markdown 格式\n'
+                '• 输入 `\\n` 表示换行\n\n'
+                '**示例：**\n'
+                '📖 **使用教程**\\n\\n1. 充值余额\\n2. 选择商品',
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("❌ 取消", callback_data='admin_custom_buttons')
+                ]]),
+                parse_mode='Markdown'
+            )
+            context.user_data['admin_waiting_for'] = 'custom_button_message'
+        else:  # url
+            await query.edit_message_text(
+                '➕ **添加自定义按钮 - 步骤 3/3**\n\n'
+                '请输入跳转链接：\n\n'
+                '**示例：**\n'
+                '`https://t.me/yourchannel`',
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("❌ 取消", callback_data='admin_custom_buttons')
+                ]]),
+                parse_mode='Markdown'
+            )
+            context.user_data['admin_waiting_for'] = 'custom_button_url'
+    
+    async def handle_custom_button_input(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """处理自定义按钮输入（交互式）"""
+        waiting_for = context.user_data.get('admin_waiting_for')
+        text = update.message.text.strip()
+        
+        if waiting_for == 'custom_button_text':
+            # 步骤 1：保存按钮文字，询问类型
+            context.user_data['custom_button_data'] = {'text': text}
+            
+            keyboard = [
+                [
+                    InlineKeyboardButton("💬 消息", callback_data='btn_type_message'),
+                    InlineKeyboardButton("🔗 链接", callback_data='btn_type_url')
+                ],
+                [InlineKeyboardButton("❌ 取消", callback_data='admin_custom_buttons')]
+            ]
+            
+            await update.message.reply_text(
+                '➕ **添加自定义按钮 - 步骤 2/3**\n\n'
+                f'按钮文字：{text}\n\n'
+                '请选择按钮类型：',
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+            
+            context.user_data['admin_waiting_for'] = None
+            return True
+        
+        elif waiting_for == 'custom_button_message':
+            # 步骤 3：保存消息内容，完成添加
+            custom_button_data = context.user_data.get('custom_button_data', {})
+            
+            # 处理换行
+            content = text.replace('\\n', '\n')
+            
+            # 添加按钮
+            self.db.add_custom_button(
+                custom_button_data['text'],
+                'message',
+                content
+            )
+            
+            await update.message.reply_text(
+                f'✅ **按钮已添加**\n\n'
+                f'按钮文字：{custom_button_data["text"]}\n'
+                f'类型：💬 消息\n\n'
+                f'**内容预览：**\n{content}',
+                parse_mode='Markdown'
+            )
+            
+            context.user_data['admin_waiting_for'] = None
+            context.user_data['custom_button_data'] = None
+            return True
+        
+        elif waiting_for == 'custom_button_url':
+            # 步骤 3：保存链接，完成添加
+            custom_button_data = context.user_data.get('custom_button_data', {})
+            
+            # 验证 URL
+            if not text.startswith(('http://', 'https://', 't.me/')):
+                await update.message.reply_text(
+                    '❌ 链接格式错误！\n\n'
+                    '链接必须以 `http://`、`https://` 或 `t.me/` 开头',
+                    parse_mode='Markdown'
+                )
+                return True
+            
+            # 添加按钮
+            self.db.add_custom_button(
+                custom_button_data['text'],
+                'url',
+                text
+            )
+            
+            await update.message.reply_text(
+                f'✅ **按钮已添加**\n\n'
+                f'按钮文字：{custom_button_data["text"]}\n'
+                f'类型：🔗 链接\n'
+                f'链接：{text}',
+                parse_mode='Markdown'
+            )
+            
+            context.user_data['admin_waiting_for'] = None
+            context.user_data['custom_button_data'] = None
+            return True
+        
+        return False
     
     async def handle_add_custom_button(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """处理添加自定义按钮输入"""
@@ -755,6 +872,10 @@ class AdminHandler:
             return False
         
         text = update.message.text.strip()
+        
+        # 处理自定义按钮交互式输入
+        if waiting_for in ['custom_button_text', 'custom_button_message', 'custom_button_url']:
+            return await self.handle_custom_button_input(update, context)
         
         if waiting_for == 'trc20_address':
             # 验证 TRC20 地址格式
