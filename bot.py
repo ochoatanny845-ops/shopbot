@@ -569,18 +569,30 @@ class SalesBot:
             )
     
     async def _show_recharge(self, query):
-        """显示充值说明（USDT TRC20）"""
-        keyboard = [
-            [InlineKeyboardButton("💰 输入充值金额", callback_data='recharge_input_amount')],
-            [InlineKeyboardButton("🏠 返回主菜单", callback_data='back_main')]
-        ]
+        """显示充值方式选择"""
+        keyboard = []
+        
+        # TRC20 充值（始终可用）
+        keyboard.append([InlineKeyboardButton("💎 USDT TRC20 充值", callback_data='recharge_method_trc20')])
+        
+        # OKPay 充值（如果已配置）
+        if hasattr(Config, 'OKPAY_SHOP_ID') and Config.OKPAY_SHOP_ID:
+            keyboard.append([InlineKeyboardButton("⚡ OKPay 快速充值", callback_data='recharge_method_okpay')])
+        
+        keyboard.append([InlineKeyboardButton("🏠 返回主菜单", callback_data='back_main')])
         
         await query.edit_message_text(
-            '💰 **USDT 充值**\n\n'
-            '支持：USDT TRC20\n'
-            '到账时间：1-3 分钟\n'
-            f'最低充值：{Config.MIN_RECHARGE_AMOUNT} USDT\n\n'
-            '请点击下方按钮输入充值金额',
+            '💰 **选择充值方式**\n\n'
+            '💎 **USDT TRC20 充值**\n'
+            '   - 去中心化，资金直达\n'
+            '   - 到账时间：1-3 分钟\n'
+            '   - 需要复制交易哈希验证\n\n'
+            + ('⚡ **OKPay 快速充值**\n'
+               '   - 支付即到账，无需等待\n'
+               '   - 到账时间：秒到\n'
+               '   - 一键支付，自动确认\n\n' 
+               if hasattr(Config, 'OKPAY_SHOP_ID') and Config.OKPAY_SHOP_ID else '') +
+            f'最低充值：{Config.MIN_RECHARGE_AMOUNT} USDT',
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode='Markdown'
         )
