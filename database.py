@@ -2,11 +2,15 @@
 数据库模块
 """
 import sqlite3
+import os
 from datetime import datetime
 from config import Config
 
 class Database:
     """数据库管理类"""
+    
+    # 类变量：记录是否已初始化过
+    _initialized = False
     
     def __init__(self):
         self.db_path = Config.DATABASE_PATH
@@ -102,4 +106,8 @@ class Database:
         
         conn.commit()
         conn.close()
-        print('✅ 数据库初始化完成')
+        
+        # 只在第一次初始化时打印
+        if not Database._initialized:
+            print('✅ 数据库初始化完成')
+            Database._initialized = True
