@@ -184,7 +184,7 @@ class MultiSourceScraper:
     def _parse_product(self, category, text, button_data):
         """解析商品信息"""
         # @hao24bot 格式: "美国 【100】- $0.15"
-        # @SanJianbot 格式: "🇬🇧 德国+49 [1.35U] 数量 (947)"
+        # @SanJianbot 格式: "🇺🇸美国实卡+1【1.15U】数量(3330)"
         
         # 尝试匹配 @hao24bot 格式
         match = re.search(r'(.+?)\s*【(\d+)】.*?\$(\d+\.?\d*)', text)
@@ -194,13 +194,13 @@ class MultiSourceScraper:
             price = float(match.group(3))
         else:
             # 尝试匹配 @SanJianbot 格式
-            # 格式：🇨🇦 加拿大+1 [0.33U] 数量 (965)
-            match = re.search(r'(.+?)\s+\[(\d+\.?\d*)U\]\s+数量\s*\((\d+)\)', text)
+            # 格式：🇺🇸美国实卡+1【1.15U】数量(3330)
+            match = re.search(r'(.+?)【(\d+\.?\d*)U】数量\((\d+)\)', text)
             if not match:
                 return None
             
             name = match.group(1).strip()
-            # 移除emoji（如 🇬🇧）
+            # 移除emoji国旗（如 🇬🇧）
             name = re.sub(r'[\U0001F1E6-\U0001F1FF]+', '', name).strip()
             price = float(match.group(2))
             stock = int(match.group(3))
