@@ -116,6 +116,21 @@ class Database:
             )
         ''')
         
+        # OKPay充值订单表
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS okpay_orders (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                order_no TEXT UNIQUE NOT NULL,
+                amount REAL NOT NULL,
+                status TEXT DEFAULT 'pending',
+                payment_url TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                completed_at TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(user_id)
+            )
+        ''')
+        
         # 自定义菜单按钮表
         c.execute('''
             CREATE TABLE IF NOT EXISTS custom_buttons (

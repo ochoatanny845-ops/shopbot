@@ -194,8 +194,7 @@ class MultiSourceScraper:
                 return None
             
             name = match.group(1).strip()
-            # 移除emoji国旗（如 🇬🇧）
-            name = re.sub(r'[\U0001F1E6-\U0001F1FF]+', '', name).strip()
+            # ✅ 保留国旗 emoji，不要移除
             price = float(match.group(2))
             stock = int(match.group(3))
         

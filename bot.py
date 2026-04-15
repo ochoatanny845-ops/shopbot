@@ -239,17 +239,26 @@ class SalesBot:
         
         if data == "show_product_overview":
             await self._show_product_overview(query)
-        elif data.startswith("source_"):
-            source_name = data[7:]
-            await self._show_categories(query, source_name)
+        elif data.startswith("src_"):
+            # 使用来源ID查找来源名称
+            source_idx = data[4:]
+            source_name = self.source_mapping.get(source_idx)
+            if source_name:
+                await self._show_categories(query, source_name)
+            else:
+                await query.answer("来源不存在", show_alert=True)
         elif data == "show_categories":
             await self._show_categories(query)
         elif data.startswith("cat_"):
-            # 解析来源和分类
+            # 解析来源ID和分类
             parts = data[4:].split('_', 1)
             if len(parts) == 2:
-                source_name, category = parts
-                await self._show_products(query, category, source_name)
+                source_idx, category = parts
+                source_name = self.source_mapping.get(source_idx)
+                if source_name:
+                    await self._show_products(query, category, source_name)
+                else:
+                    await query.answer("来源不存在", show_alert=True)
             else:
                 category = parts[0]
                 await self._show_products(query, category)
@@ -296,14 +305,17 @@ class SalesBot:
         
         keyboard = []
         
-        # 为每个来源创建按钮
-        for source_name, stock in sources:
+        # 为每个来源创建按钮（使用索引作为ID）
+        for idx, (source_name, stock) in enumerate(sources):
             keyboard.append([InlineKeyboardButton(
                 f"{source_name} ({stock}个)",
-                callback_data=f"source_{source_name}"
+                callback_data=f"src_{idx}"  # ✅ 使用短ID
             )])
         
         keyboard.append([InlineKeyboardButton("🏠 返回主菜单", callback_data="back_main")])
+        
+        # 缓存来源映射（临时存储在上下文中）
+        self.source_mapping = {str(idx): name for idx, (name, _) in enumerate(sources)}
         
         await query.edit_message_text(
             "📱 **Telegram账号商品**\n\n"
@@ -352,20 +364,23 @@ class SalesBot:
         
         keyboard = []
         for cat, stock in categories:
-            # 如果指定了来源，callback_data 包含来源信息
+            # 如果指定了来源，callback_data 包含来源ID
             if source_name:
-                # 限制长度：Telegram callback_data 最多 64 字节
-                source_short = source_name[:10]  # 来源名截断到 10 字符
-                cat_short = cat[:30]  # 分类名截断到 30 字符
-                callback_data = f"cat_{source_short}_{cat_short}"
-                # 确保不超过 64 字节
-                if len(callback_data.encode('utf-8')) > 64:
-                    callback_data = callback_data.encode('utf-8')[:64].decode('utf-8', errors='ignore')
+                # 查找来源ID
+                source_idx = None
+                for idx, name in self.source_mapping.items():
+                    if name == source_name:
+                        source_idx = idx
+                        break
+                
+                if source_idx:
+                    # 限制分类名长度，确保总长度<64字节
+                    cat_short = cat[:40]
+                    callback_data = f"cat_{source_idx}_{cat_short}"
+                else:
+                    callback_data = f"cat_{cat[:50]}"
             else:
-                callback_data = f"cat_{cat}"
-                # 确保不超过 64 字节
-                if len(callback_data.encode('utf-8')) > 64:
-                    callback_data = callback_data.encode('utf-8')[:60].decode('utf-8', errors='ignore')
+                callback_data = f"cat_{cat[:50]}"
             
             keyboard.append([InlineKeyboardButton(
                 f"{cat} 【{stock}】",
