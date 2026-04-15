@@ -25,7 +25,7 @@ class AutoPurchaser:
             self.client = await ClientManager.get_client()
         print('✅ 代购模块已准备就绪')
     
-    async def purchase(self, product_id, quantity=1, user_id=None, order_id=None):
+    async def purchase(self, product_id, quantity=1, user_id=None, order_id=None, source_bot=None, buyer_session=None):
         """
         购买商品（串行处理，确保订单不混淆）
         
@@ -34,42 +34,62 @@ class AutoPurchaser:
             quantity: 购买数量
             user_id: 用户ID（用于创建隔离目录）
             order_id: 订单ID（用于目录命名）
+            source_bot: 源机器人用户名（如 @hao24bot）
+            buyer_session: 代购账号 session 文件路径
         
         Returns:
             list: 文件列表 [{'path': ..., 'name': ...}, ...]
         """
+        # 使用传入的来源，如果没有则使用默认配置
+        source_bot = source_bot or Config.SOURCE_BOT
+        buyer_session = buyer_session or Config.BUYER_SESSION
+        
+        # 创建临时客户端（使用指定的 session）
+        temp_client = TelegramClient(buyer_session, Config.API_ID, Config.API_HASH)
+        
         # 🔒 全局锁：同一时间只处理一个订单
         async with AutoPurchaser._purchase_lock:
             print(f'🔒 订单 #{order_id} (用户 {user_id}) 开始处理...')
+            print(f'📱 使用来源: {source_bot}')
+            print(f'🔑 使用 session: {buyer_session}')
             
-            # 查询商品信息
-            conn = self.db.get_connection()
-            c = conn.cursor()
-            
-            c.execute('''
-                SELECT name, category, original_price
-                FROM products
-                WHERE id = ? AND is_active = 1
-            ''', (product_id,))
-            
-            product = c.fetchone()
-            conn.close()
-            
-            if not product:
-                raise Exception('商品不存在')
-            
-            name, category, price = product
-            
-            print(f'📦 开始代购: {name} (数量: {quantity})')
+            # 保存原始 client
+            original_client = self.client
             
             try:
+                # 启动临时客户端
+                await temp_client.start()
+                
+                # 临时替换 self.client（让所有内部方法使用新的 client）
+                self.client = temp_client
+                
+                # 查询商品信息
+                conn = self.db.get_connection()
+                c = conn.cursor()
+                
+                c.execute('''
+                    SELECT name, category, original_price
+                    FROM products
+                    WHERE id = ? AND is_active = 1
+                ''', (product_id,))
+                
+                product = c.fetchone()
+                conn.close()
+                
+                if not product:
+                    raise Exception('商品不存在')
+                
+                name, category, price = product
+                
+                print(f'📦 开始代购: {name} (数量: {quantity})')
+                
                 # 创建用户专属目录
                 user_dir = os.path.join(Config.ORDER_FILES_DIR, str(user_id), f'order_{order_id}')
                 os.makedirs(user_dir, exist_ok=True)
                 print(f'📁 文件保存路径: {user_dir}')
                 
-                # ✅ 检查余额并自动充值
-                balance = await self.check_balance()
+                # ✅ 检查余额并自动充值（使用 source_bot）
+                balance = await self._check_balance_for_bot(source_bot)
                 required_amount = price * quantity
                 
                 if balance < required_amount:
@@ -82,7 +102,7 @@ class AutoPurchaser:
                     print(f'💰 自动充值 ${recharge_amount} (整数)...')
                     
                     try:
-                        await self.auto_recharge(recharge_amount)
+                        await self._auto_recharge_for_bot(source_bot, recharge_amount)
                         print('✅ 充值成功，继续购买')
                     except Exception as e:
                         raise Exception(f'自动充值失败: {e}')
@@ -90,12 +110,38 @@ class AutoPurchaser:
                     print(f'✅ 余额充足 (需要: ${required_amount:.2f}, 余额: ${balance:.2f})')
                 
                 # 记录购买前的最后消息ID（用于隔离）
-                msgs = await self.client.get_messages(Config.SOURCE_BOT, limit=1)
+                msgs = await self.client.get_messages(source_bot, limit=1)
                 last_msg_id = msgs[0].id if msgs else 0
                 print(f'📍 起始消息ID: {last_msg_id}')
                 
                 # 1. 导航到分类
-                await self._navigate_to_category(category)
+                await self._navigate_to_category_for_bot(source_bot, category)
+                
+                # 2. 查找并点击商品
+                await self._click_product_for_bot(source_bot, name)
+                
+                # 3. 点击购买
+                await self._click_buy_for_bot(source_bot)
+                
+                # 4. 输入数量
+                await self._input_quantity_for_bot(source_bot, quantity)
+                
+                # 5. 确认购买
+                await self._confirm_purchase_for_bot(source_bot)
+                
+                # 6. 等待并接收文件（只接收 last_msg_id 之后的）
+                files = await self._wait_for_files_for_bot(source_bot, after_msg_id=last_msg_id, save_dir=user_dir)
+                
+                print(f'✅ 订单 #{order_id} 代购成功: 收到 {len(files)} 个文件')
+                return files
+                
+            finally:
+                # 恢复原始 client
+                self.client = original_client
+                
+                # 断开临时客户端
+                await temp_client.disconnect()
+                print(f'✅ 订单 #{order_id} 处理完成')
                 
                 # 2. 查找并点击商品
                 await self._click_product(name)
@@ -118,6 +164,166 @@ class AutoPurchaser:
             except Exception as e:
                 print(f'❌ 订单 #{order_id} 代购失败: {e}')
                 raise
+    
+    async def _navigate_to_category_for_bot(self, bot, category):
+        """导航到分类（支持指定 bot）"""
+        # 发送 🏠主菜单 回到主页
+        await self.client.send_message(bot, '🏠主菜单')
+        await asyncio.sleep(2)
+        
+        # 点击"账号列表"
+        msgs = await self.client.get_messages(bot, limit=1)
+        if msgs and msgs[0].buttons:
+            for row in msgs[0].buttons:
+                for btn in row:
+                    if '账号列表' in btn.text or '🛒' in btn.text:
+                        await btn.click()
+                        await asyncio.sleep(2)
+                        break
+        
+        # 点击分类
+        msgs = await self.client.get_messages(bot, limit=1)
+        if msgs and msgs[0].buttons:
+            for row in msgs[0].buttons:
+                for btn in row:
+                    if category in btn.text:
+                        await btn.click()
+                        await asyncio.sleep(2)
+                        return
+        
+        raise Exception(f'未找到分类: {category}')
+    
+    async def _click_product_for_bot(self, bot, name):
+        """点击商品（支持指定 bot）"""
+        max_attempts = 3
+        for attempt in range(max_attempts):
+            msgs = await self.client.get_messages(bot, limit=1)
+            if msgs and msgs[0].buttons:
+                for row in msgs[0].buttons:
+                    for btn in row:
+                        if name in btn.text:
+                            await btn.click()
+                            await asyncio.sleep(2)
+                            return
+            
+            if attempt < max_attempts - 1:
+                await asyncio.sleep(1)
+        
+        raise Exception(f'未找到商品: {name}')
+    
+    async def _click_buy_for_bot(self, bot):
+        """点击购买按钮（支持指定 bot）"""
+        msgs = await self.client.get_messages(bot, limit=1)
+        if msgs and msgs[0].buttons:
+            for row in msgs[0].buttons:
+                for btn in row:
+                    if '购买' in btn.text or '💰' in btn.text:
+                        await btn.click()
+                        await asyncio.sleep(2)
+                        return
+        raise Exception('未找到购买按钮')
+    
+    async def _input_quantity_for_bot(self, bot, quantity):
+        """输入购买数量（支持指定 bot）"""
+        await self.client.send_message(bot, str(quantity))
+        await asyncio.sleep(2)
+    
+    async def _confirm_purchase_for_bot(self, bot):
+        """确认购买（支持指定 bot）"""
+        msgs = await self.client.get_messages(bot, limit=1)
+        if msgs and msgs[0].buttons:
+            for row in msgs[0].buttons:
+                for btn in row:
+                    if '确认' in btn.text or '✅' in btn.text:
+                        await btn.click()
+                        await asyncio.sleep(2)
+                        return
+        raise Exception('未找到确认按钮')
+    
+    async def _wait_for_files_for_bot(self, bot, after_msg_id, save_dir, timeout=180):
+        """等待并接收文件（支持指定 bot）"""
+        files = []
+        start_time = asyncio.get_event_loop().time()
+        
+        while asyncio.get_event_loop().time() - start_time < timeout:
+            msgs = await self.client.get_messages(bot, limit=10)
+            
+            for msg in msgs:
+                if msg.id <= after_msg_id:
+                    continue
+                
+                if msg.media and hasattr(msg.media, 'document'):
+                    filename = msg.file.name or f'file_{msg.id}'
+                    
+                    if filename.endswith('.mp4'):
+                        continue
+                    
+                    if not (filename.endswith('.txt') or filename.endswith('.zip')):
+                        continue
+                    
+                    filepath = os.path.join(save_dir, filename)
+                    
+                    if any(f['path'] == filepath for f in files):
+                        continue
+                    
+                    await self.client.download_media(msg, filepath)
+                    files.append({'path': filepath, 'name': filename})
+            
+            if len(files) >= 3:
+                break
+            
+            await asyncio.sleep(5)
+        
+        if not files:
+            raise Exception('未收到文件')
+        
+        return files
+    
+    async def _check_balance_for_bot(self, bot):
+        """检查余额（支持指定 bot）"""
+        await self.client.send_message(bot, '🏠主菜单')
+        await asyncio.sleep(2)
+        
+        msgs = await self.client.get_messages(bot, limit=1)
+        if msgs and msgs[0].text:
+            import re
+            match = re.search(r'余额[：:]\s*\$?(\d+\.?\d*)', msgs[0].text)
+            if match:
+                return float(match.group(1))
+        
+        return 0.0
+    
+    async def _auto_recharge_for_bot(self, bot, amount):
+        """自动充值（支持指定 bot）"""
+        await self.client.send_message(bot, '🏠主菜单')
+        await asyncio.sleep(2)
+        
+        msgs = await self.client.get_messages(bot, limit=1)
+        if msgs and msgs[0].buttons:
+            for row in msgs[0].buttons:
+                for btn in row:
+                    if '充值' in btn.text or '💰' in btn.text:
+                        await btn.click()
+                        await asyncio.sleep(2)
+                        break
+        
+        await self.client.send_message(bot, str(amount))
+        await asyncio.sleep(2)
+        
+        msgs = await self.client.get_messages(bot, limit=1)
+        if msgs and msgs[0].buttons:
+            for row in msgs[0].buttons:
+                for btn in row:
+                    if '确认' in btn.text or '✅' in btn.text:
+                        await btn.click()
+                        await asyncio.sleep(2)
+                        break
+        
+        print(f'💰 等待充值到账...')
+        await asyncio.sleep(120)
+        
+        balance = await self._check_balance_for_bot(bot)
+        print(f'✅ 充值后余额: ${balance:.2f}')
     
     async def _navigate_to_category(self, category):
         """导航到分类"""
