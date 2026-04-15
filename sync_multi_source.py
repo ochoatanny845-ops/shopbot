@@ -45,8 +45,8 @@ class MultiSourceScraper:
         try:
             await client.start()
             
-            # 发送 /start 获取主菜单
-            await client.send_message(source_bot, '/start')
+            # 发送 🏠主菜单 获取主菜单
+            await client.send_message(source_bot, '🏠主菜单')
             await asyncio.sleep(2)
             
             # 点击"商品分类"或"账号列表"
@@ -100,7 +100,7 @@ class MultiSourceScraper:
     async def _scrape_category(self, client, source_bot, category):
         """抓取单个分类的商品"""
         # 返回主菜单
-        await client.send_message(source_bot, '/start')
+        await client.send_message(source_bot, '🏠主菜单')
         await asyncio.sleep(2)
         
         # 点击商品分类或账号列表

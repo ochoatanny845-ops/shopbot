@@ -167,8 +167,8 @@ class AutoPurchaser:
     
     async def _navigate_to_category_for_bot(self, bot, category):
         """导航到分类（支持指定 bot）"""
-        # 发送 /start 回到主页
-        await self.client.send_message(bot, '/start')
+        # 发送 🏠主菜单 回到主页
+        await self.client.send_message(bot, '🏠主菜单')
         await asyncio.sleep(2)
         
         # 点击"商品分类"或"账号列表"
@@ -288,8 +288,8 @@ class AutoPurchaser:
     
     async def _check_balance_for_bot(self, bot):
         """检查余额（支持指定 bot）"""
-        # 发送 /start 回到主页
-        await self.client.send_message(bot, '/start')
+        # 发送 🏠主菜单 回到主页
+        await self.client.send_message(bot, '🏠主菜单')
         await asyncio.sleep(2)
         
         msgs = await self.client.get_messages(bot, limit=1)
