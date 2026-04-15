@@ -61,7 +61,8 @@ class MultiSourceScraper:
             
             # 遍历每个分类
             total_products = 0
-            for category in categories:
+            for i, category in enumerate(categories, 1):
+                print(f'   [{i}/{len(categories)}] 同步分类: {category}')
                 try:
                     products = await self._scrape_category(client, source_bot, purchaser, category)
                     
@@ -75,9 +76,16 @@ class MultiSourceScraper:
                         )
                     
                     total_products += len(products)
-                    print(f'      {category}: {len(products)} 个商品')
+                    print(f'      ✅ {len(products)} 个商品')
+                    
+                    # ⏱️ 分类之间延迟3秒，避免卡死源机器人
+                    if i < len(categories):
+                        await asyncio.sleep(3)
+                    
                 except Exception as e:
-                    print(f'      {category}: 抓取失败 - {e}')
+                    print(f'      ❌ 抓取失败 - {e}')
+                    # 出错后也延迟，避免连续失败
+                    await asyncio.sleep(3)
             
             print(f'   总计: {total_products} 个商品')
             
@@ -151,12 +159,6 @@ class MultiSourceScraper:
             print(f'         ⚠️ 未找到按钮')
             return []
         
-        # 🔍 调试：打印所有按钮
-        print(f'         📋 页面按钮：')
-        for row in msgs[0].buttons:
-            for btn in row:
-                print(f'            - {btn.text}')
-        
         products = []
         for row in msgs[0].buttons:
             for btn in row:
@@ -164,8 +166,6 @@ class MultiSourceScraper:
                     product = self._parse_product(category, btn.text, btn.data)
                     if product:
                         products.append(product)
-                    else:
-                        print(f'         ⚠️ 无法解析: {btn.text}')
         
         # 点击返回按钮回到分类列表
         msgs = await client.get_messages(source_bot, limit=1)
