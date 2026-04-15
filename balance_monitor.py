@@ -17,7 +17,7 @@ class BalanceMonitor:
     OKPAY_THRESHOLD = 20.0       # OKPay 钱包余额阈值（USDT）
     
     # 检查间隔（秒）
-    CHECK_INTERVAL = 3600  # 每小时检查一次
+    CHECK_INTERVAL = 21600  # 每 6 小时检查一次（避免干扰代购）
     
     def __init__(self):
         self.db = Database()
@@ -50,6 +50,12 @@ class BalanceMonitor:
     async def check_all_balances(self):
         """检查所有余额"""
         print(f'\n[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] 开始检查余额...')
+        
+        # ✅ 检查代购是否正在运行（避免冲突）
+        from purchaser import AutoPurchaser
+        if AutoPurchaser._purchase_lock.locked():
+            print('  ⏭ 跳过检查：代购正在处理订单，避免干扰')
+            return
         
         # 1. 检查源机器人余额
         source_balance = await self.check_source_bot_balance()
