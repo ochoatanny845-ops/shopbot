@@ -37,7 +37,7 @@ async def main():
     # 初始化数据库
     db = Database()
     
-    # 登录代购账号1（只登录一次，用于主机器人功能）
+    # 登录代购账号1（主账号，用于销售机器人）
     from client_manager import ClientManager
     buyer_client = await ClientManager.get_client()
     
@@ -46,6 +46,15 @@ async def main():
     await purchaser.start()
     
     print('✅ 代购模块已准备就绪')
+    
+    # 显示所有配置的商品来源
+    print()
+    print('📋 已配置的商品来源：')
+    for idx, source in enumerate(Config.PRODUCT_SOURCES, 1):
+        print(f'   {idx}. {source["name"]}')
+        print(f'      源机器人: {source["source_bot"]}')
+        print(f'      Session: {source["session"]}')
+    print()
     
     # 检查数据库中是否有商品
     conn = db.get_connection()

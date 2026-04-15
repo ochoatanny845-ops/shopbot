@@ -215,30 +215,47 @@ class MultiSourceScraper:
     def _save_product(self, source_name, source_bot, buyer_session, category, name, 
                      original_price, selling_price, stock, button_data):
         """保存商品到数据库"""
-        conn = self.db.get_connection()
-        c = conn.cursor()
+        import time
         
-        # 生成唯一ID
-        source_product_id = f'{source_bot}_{category}_{name}'
-        
-        # 插入或更新
-        c.execute('''
-            INSERT INTO products (
-                source_product_id, source_name, source_bot, buyer_session,
-                category, name, original_price, selling_price, stock, button_data
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(source_product_id) DO UPDATE SET
-                stock = excluded.stock,
-                original_price = excluded.original_price,
-                selling_price = excluded.selling_price,
-                last_updated = CURRENT_TIMESTAMP
-        ''', (
-            source_product_id, source_name, source_bot, buyer_session,
-            category, name, original_price, selling_price, stock, button_data
-        ))
-        
-        conn.commit()
-        conn.close()
+        # 重试逻辑：避免 database is locked
+        max_retries = 5
+        for attempt in range(max_retries):
+            try:
+                conn = self.db.get_connection()
+                conn.execute('PRAGMA busy_timeout = 30000')  # 30秒超时
+                c = conn.cursor()
+                
+                # 生成唯一ID
+                source_product_id = f'{source_bot}_{category}_{name}'
+                
+                # 插入或更新
+                c.execute('''
+                    INSERT INTO products (
+                        source_product_id, source_name, source_bot, buyer_session,
+                        category, name, original_price, selling_price, stock, button_data
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(source_product_id) DO UPDATE SET
+                        stock = excluded.stock,
+                        original_price = excluded.original_price,
+                        selling_price = excluded.selling_price,
+                        last_updated = CURRENT_TIMESTAMP
+                ''', (
+                    source_product_id, source_name, source_bot, buyer_session,
+                    category, name, original_price, selling_price, stock, button_data
+                ))
+                
+                conn.commit()
+                conn.close()
+                break  # 成功，跳出循环
+                
+            except Exception as e:
+                if 'locked' in str(e).lower() and attempt < max_retries - 1:
+                    time.sleep(1)  # 等待1秒后重试
+                    continue
+                else:
+                    if conn:
+                        conn.close()
+                    raise
 
 async def main():
     """主函数"""
