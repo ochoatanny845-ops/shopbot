@@ -194,7 +194,8 @@ class MultiSourceScraper:
             price = float(match.group(3))
         else:
             # 尝试匹配 @SanJianbot 格式
-            match = re.search(r'(.+?)\s*\[(\d+\.?\d*)U\]\s*数量\s*\((\d+)\)', text)
+            # 格式：🇨🇦 加拿大+1 [0.33U] 数量 (965)
+            match = re.search(r'(.+?)\s+\[(\d+\.?\d*)U\]\s+数量\s*\((\d+)\)', text)
             if not match:
                 return None
             
