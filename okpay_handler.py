@@ -36,11 +36,11 @@ class OKPayHandler:
         """
         try:
             data = {
-                'unique_id': unique_id,
-                'name': f'账号商城充值',
-                'amount': amount,
+                'unique_id': str(unique_id),
+                'name': '账号商城充值',
+                'amount': str(amount),
                 'return_url': f'https://t.me/{self.bot_username}',
-                'coin': coin
+                'coin': str(coin)
             }
             
             # 签名
