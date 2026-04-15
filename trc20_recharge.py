@@ -5,6 +5,7 @@ import requests
 import time
 import base58
 import hashlib
+from datetime import datetime
 from typing import Optional, Dict
 
 class TRC20Recharge:
@@ -152,12 +153,26 @@ class TRC20Recharge:
             
             data = response.json()
             
+            # 打印原始数据（调试用）
+            print(f'  📄 原始数据键: {list(data.keys())}')
+            
             # 检查交易是否存在
             if not data or 'txID' not in data:
                 return {
                     'success': False,
                     'message': '❌ 交易不存在或尚未上链'
                 }
+            
+            # 🔧 同时获取交易信息（包含时间戳）
+            info_url = f'{self.TRONGRID_API}/walletsolidity/gettransactioninfobyid'
+            info_response = requests.post(info_url, json=payload, headers=headers, timeout=10)
+            
+            if info_response.status_code == 200:
+                info_data = info_response.json()
+                # 合并时间戳信息
+                if 'blockTimeStamp' in info_data:
+                    data['block_timestamp'] = info_data['blockTimeStamp']
+                print(f'  ℹ️ 交易信息: {list(info_data.keys())}')
             
             # 解析交易详情
             tx_info = self._parse_transaction(data)
@@ -178,9 +193,20 @@ class TRC20Recharge:
     
     def _parse_transaction(self, data: Dict) -> Dict:
         """解析交易数据"""
+        # 获取时间戳（多种可能的字段）
+        timestamp = 0
+        if 'block_timestamp' in data:
+            timestamp = data['block_timestamp'] // 1000  # 毫秒 → 秒
+        elif 'blockTimeStamp' in data:
+            timestamp = data['blockTimeStamp'] // 1000
+        elif 'raw_data' in data and 'timestamp' in data['raw_data']:
+            timestamp = data['raw_data']['timestamp'] // 1000
+        
+        print(f'  🕐 交易时间戳: {timestamp} ({datetime.fromtimestamp(timestamp) if timestamp > 0 else "未找到"})')
+        
         result = {
             'confirmed': data.get('ret', [{}])[0].get('contractRet') == 'SUCCESS',
-            'timestamp': data.get('block_timestamp', 0) // 1000,  # 转为秒
+            'timestamp': timestamp,
         }
         
         # 解析合约调用
