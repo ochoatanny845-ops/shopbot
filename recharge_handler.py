@@ -117,16 +117,26 @@ class RechargeHandler:
         img.save(bio, 'PNG')
         bio.seek(0)
         
+        # 计算有效期（当前时间 + 10 分钟）
+        from datetime import datetime, timedelta
+        now = datetime.now()
+        expire_time = now + timedelta(minutes=10)
+        
         # 发送支付信息
         message = (
             f'💰 **充值订单 #{order_id}**\n\n'
             f'充值金额：`{amount}` USDT\n'
             f'网络类型：TRC20 (Tron)\n'
             f'收款地址：\n`{self.recipient_address}`\n\n'
+            f'⏰ **订单时间：**\n'
+            f'创建时间：{now.strftime("%Y-%m-%d %H:%M:%S")}\n'
+            f'过期时间：{expire_time.strftime("%Y-%m-%d %H:%M:%S")}\n'
+            f'有效期：**10 分钟**\n\n'
             f'⚠️ **重要提示：**\n'
             f'1️⃣ 请确保使用 **TRC20 网络**\n'
             f'2️⃣ 转账完成后，发送交易哈希（TxID）\n'
-            f'3️⃣ 系统将自动验证并入账\n\n'
+            f'3️⃣ 系统将自动验证并入账\n'
+            f'4️⃣ 超过 10 分钟订单自动失效\n\n'
             f'📝 交易哈希格式示例：\n'
             f'`7a1b2c3d4e5f...`'
         )
@@ -141,7 +151,8 @@ class RechargeHandler:
         # 提示等待 TxID
         await update.message.reply_text(
             '⏳ 请完成转账后，发送交易哈希（TxID）给我\n\n'
-            '💡 在钱包中复制交易哈希即可',
+            f'💡 在钱包中复制交易哈希即可\n'
+            f'⏰ 请在 {expire_time.strftime("%H:%M:%S")} 前提交',
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton("❌ 取消充值", callback_data=f'cancel_recharge_{order_id}')
             ]])
