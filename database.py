@@ -43,6 +43,9 @@ class Database:
             CREATE TABLE IF NOT EXISTS products (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 source_product_id TEXT UNIQUE,
+                source_name TEXT,
+                source_bot TEXT,
+                buyer_session TEXT,
                 category TEXT NOT NULL,
                 name TEXT NOT NULL,
                 country TEXT,
