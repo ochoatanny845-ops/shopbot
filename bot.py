@@ -227,6 +227,11 @@ class SalesBot:
             await self.admin_handler.handle_broadcast_callback(update, context)
             return
         
+        # 自定义按钮类型选择回调
+        if data.startswith('btn_type_'):
+            await self.admin_handler.handle_admin_callback(update, context)
+            return
+        
         # 自定义按钮回调
         if data.startswith('custom_btn_'):
             await self._handle_custom_button(query)
