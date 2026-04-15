@@ -113,12 +113,26 @@ class Database:
             )
         ''')
         
+        # 自定义菜单按钮表
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS custom_buttons (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                text TEXT NOT NULL,
+                type TEXT NOT NULL,
+                content TEXT NOT NULL,
+                position INTEGER DEFAULT 0,
+                is_active INTEGER DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
         # 初始化默认配置
         c.execute('''
             INSERT OR IGNORE INTO settings (key, value, updated_at)
             VALUES 
                 ('trc20_address', 'TV77o3KfH8DkQNNEsvDLNo765ABcqr3MnM', datetime('now')),
-                ('start_message', '👋 欢迎使用账号购买系统！\n\n🛍 请选择服务：', datetime('now'))
+                ('start_message', '👋 欢迎使用账号购买系统！\n\n🛍 请选择服务：', datetime('now')),
+                ('customer_service_url', 'https://t.me/id2uu', datetime('now'))
         ''')
         
         conn.commit()
@@ -190,3 +204,105 @@ class Database:
             'today_income': today_income,
             'yesterday_income': yesterday_income
         }
+    
+    def get_custom_buttons(self):
+        """获取所有自定义按钮"""
+        conn = self.get_connection()
+        c = conn.cursor()
+        
+        c.execute('''
+            SELECT id, text, type, content, position
+            FROM custom_buttons
+            WHERE is_active = 1
+            ORDER BY position ASC
+        ''')
+        
+        buttons = c.fetchall()
+        conn.close()
+        
+        return [
+            {
+                'id': row[0],
+                'text': row[1],
+                'type': row[2],
+                'content': row[3],
+                'position': row[4]
+            }
+            for row in buttons
+        ]
+    
+    def add_custom_button(self, text: str, btn_type: str, content: str):
+        """添加自定义按钮"""
+        conn = self.get_connection()
+        c = conn.cursor()
+        
+        # 获取当前最大位置
+        c.execute('SELECT MAX(position) FROM custom_buttons')
+        max_pos = c.fetchone()[0] or 0
+        
+        c.execute('''
+            INSERT INTO custom_buttons (text, type, content, position, created_at)
+            VALUES (?, ?, ?, ?, datetime('now'))
+        ''', (text, btn_type, content, max_pos + 1))
+        
+        conn.commit()
+        conn.close()
+    
+    def update_custom_button(self, button_id: int, text: str, btn_type: str, content: str):
+        """更新自定义按钮"""
+        conn = self.get_connection()
+        c = conn.cursor()
+        
+        c.execute('''
+            UPDATE custom_buttons
+            SET text = ?, type = ?, content = ?
+            WHERE id = ?
+        ''', (text, btn_type, content, button_id))
+        
+        conn.commit()
+        conn.close()
+    
+    def delete_custom_button(self, button_id: int):
+        """删除自定义按钮"""
+        conn = self.get_connection()
+        c = conn.cursor()
+        
+        c.execute('UPDATE custom_buttons SET is_active = 0 WHERE id = ?', (button_id,))
+        
+        conn.commit()
+        conn.close()
+    
+    def move_custom_button(self, button_id: int, direction: str):
+        """移动按钮位置（up/down）"""
+        conn = self.get_connection()
+        c = conn.cursor()
+        
+        # 获取当前按钮位置
+        c.execute('SELECT position FROM custom_buttons WHERE id = ?', (button_id,))
+        current_pos = c.fetchone()[0]
+        
+        if direction == 'up':
+            # 与上一个按钮交换位置
+            c.execute('''
+                UPDATE custom_buttons
+                SET position = CASE
+                    WHEN id = ? THEN position - 1
+                    WHEN position = ? THEN position + 1
+                    ELSE position
+                END
+                WHERE position IN (?, ?) AND is_active = 1
+            ''', (button_id, current_pos - 1, current_pos, current_pos - 1))
+        else:  # down
+            # 与下一个按钮交换位置
+            c.execute('''
+                UPDATE custom_buttons
+                SET position = CASE
+                    WHEN id = ? THEN position + 1
+                    WHEN position = ? THEN position - 1
+                    ELSE position
+                END
+                WHERE position IN (?, ?) AND is_active = 1
+            ''', (button_id, current_pos + 1, current_pos, current_pos + 1))
+        
+        conn.commit()
+        conn.close()

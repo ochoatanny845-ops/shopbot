@@ -176,17 +176,27 @@ class SalesBot:
         # 获取余额
         balance = self._get_balance(user.id)
         
-        # 从数据库读取欢迎文案
+        # 从数据库读取欢迎文案和客服链接
         start_message = self.db.get_setting('start_message', '👋 欢迎使用账号购买系统！\n\n🛍 请选择服务：')
+        customer_service_url = self.db.get_setting('customer_service_url', 'https://t.me/id2uu')
         
+        # 基础按钮
         keyboard = [
-            [InlineKeyboardButton("📱 Telegram账号", callback_data="show_product_overview")],
+            [InlineKeyboardButton("📱 Telegram账号购买", callback_data="show_product_overview")],
             [
                 InlineKeyboardButton("💰 充值余额", callback_data="recharge"),
                 InlineKeyboardButton("📋 我的订单", callback_data="orders")
             ],
-            [InlineKeyboardButton("📢 帮助", callback_data="help")]
+            [InlineKeyboardButton("👨‍💼 联系客服", url=customer_service_url)]
         ]
+        
+        # 加载自定义按钮
+        custom_buttons = self.db.get_custom_buttons()
+        for btn in custom_buttons:
+            if btn['type'] == 'url':
+                keyboard.append([InlineKeyboardButton(btn['text'], url=btn['content'])])
+            else:  # message
+                keyboard.append([InlineKeyboardButton(btn['text'], callback_data=f"custom_btn_{btn['id']}")])
         
         await update.message.reply_text(
             f"{start_message}\n\n"
@@ -215,6 +225,11 @@ class SalesBot:
         # 群发回调
         if data.startswith('broadcast_'):
             await self.admin_handler.handle_broadcast_callback(update, context)
+            return
+        
+        # 自定义按钮回调
+        if data.startswith('custom_btn_'):
+            await self._handle_custom_button(query)
             return
         
         if data == "show_product_overview":
@@ -728,17 +743,27 @@ class SalesBot:
         user = query.from_user
         balance = self._get_balance(user.id)
         
-        # 从数据库读取欢迎文案
+        # 从数据库读取欢迎文案和客服链接
         start_message = self.db.get_setting('start_message', '👋 欢迎使用账号购买系统！\n\n🛍 请选择服务：')
+        customer_service_url = self.db.get_setting('customer_service_url', 'https://t.me/id2uu')
         
+        # 基础按钮
         keyboard = [
-            [InlineKeyboardButton("📱 Telegram账号", callback_data="show_product_overview")],
+            [InlineKeyboardButton("📱 Telegram账号购买", callback_data="show_product_overview")],
             [
                 InlineKeyboardButton("💰 充值余额", callback_data="recharge"),
                 InlineKeyboardButton("📋 我的订单", callback_data="orders")
             ],
-            [InlineKeyboardButton("📢 帮助", callback_data="help")]
+            [InlineKeyboardButton("👨‍💼 联系客服", url=customer_service_url)]
         ]
+        
+        # 加载自定义按钮
+        custom_buttons = self.db.get_custom_buttons()
+        for btn in custom_buttons:
+            if btn['type'] == 'url':
+                keyboard.append([InlineKeyboardButton(btn['text'], url=btn['content'])])
+            else:  # message
+                keyboard.append([InlineKeyboardButton(btn['text'], callback_data=f"custom_btn_{btn['id']}")])
         
         await query.edit_message_text(
             f"{start_message}\n\n"
@@ -806,3 +831,40 @@ class SalesBot:
             )
         else:
             await query.answer('❌ 订单不存在或已处理', show_alert=True)
+    
+    async def _handle_custom_button(self, query):
+        """处理自定义按钮点击"""
+        button_id = int(query.data.split('_')[2])
+        
+        # 查询按钮信息
+        conn = self.db.get_connection()
+        c = conn.cursor()
+        
+        c.execute('''
+            SELECT text, type, content
+            FROM custom_buttons
+            WHERE id = ? AND is_active = 1
+        ''', (button_id,))
+        
+        result = c.fetchone()
+        conn.close()
+        
+        if not result:
+            await query.answer('❌ 按钮不存在', show_alert=True)
+            return
+        
+        text, btn_type, content = result
+        
+        # 消息类型按钮，回复内容
+        if btn_type == 'message':
+            await query.answer()
+            await query.edit_message_text(
+                content,
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("🏠 返回主菜单", callback_data='back_main')
+                ]]),
+                parse_mode='Markdown'
+            )
+        else:
+            # URL 类型（不应该走到这里，因为 URL 按钮直接跳转）
+            await query.answer('❌ 按钮类型错误', show_alert=True)

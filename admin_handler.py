@@ -37,6 +37,7 @@ class AdminHandler:
                 InlineKeyboardButton("📢 群发通知", callback_data='admin_broadcast'),
                 InlineKeyboardButton("📝 主菜单编辑", callback_data='admin_edit_start')
             ],
+            [InlineKeyboardButton("🎛️ 自定义按钮", callback_data='admin_custom_buttons')],
             [InlineKeyboardButton("🏠 返回主菜单", callback_data='back_main')]
         ]
         
@@ -181,6 +182,10 @@ class AdminHandler:
             await self._edit_trc20_address(query, context)
         elif data == 'admin_edit_start_text':
             await self._edit_start_text(query, context)
+        elif data == 'admin_custom_buttons':
+            await self._manage_custom_buttons(query, context)
+        elif data.startswith('admin_btn_'):
+            await self._handle_button_management(query, context)
         elif data == 'admin_back':
             # 返回管理员主菜单
             stats = self.db.get_statistics()
@@ -194,6 +199,7 @@ class AdminHandler:
                     InlineKeyboardButton("📢 群发通知", callback_data='admin_broadcast'),
                     InlineKeyboardButton("📝 主菜单编辑", callback_data='admin_edit_start')
                 ],
+                [InlineKeyboardButton("🎛️ 自定义按钮", callback_data='admin_custom_buttons')],
                 [InlineKeyboardButton("🏠 返回主菜单", callback_data='back_main')]
             ]
             
@@ -519,6 +525,168 @@ class AdminHandler:
         # 清除群发数据
         context.user_data['broadcast_data'] = None
     
+    async def _manage_custom_buttons(self, query, context):
+        """管理自定义按钮"""
+        buttons = self.db.get_custom_buttons()
+        
+        text = '🎛️ **自定义菜单按钮管理**\n\n'
+        
+        if buttons:
+            text += '**当前按钮：**\n\n'
+            for btn in buttons:
+                btn_type_text = '🔗 链接' if btn['type'] == 'url' else '💬 消息'
+                text += f'{btn["position"]}. {btn["text"]} ({btn_type_text})\n'
+                text += f'   内容: {btn["content"][:50]}...\n\n'
+        else:
+            text += '暂无自定义按钮\n\n'
+        
+        text += '点击下方按钮管理'
+        
+        keyboard = [[InlineKeyboardButton("➕ 添加按钮", callback_data='admin_btn_add')]]
+        
+        if buttons:
+            keyboard.append([InlineKeyboardButton("📋 编辑按钮", callback_data='admin_btn_list')])
+        
+        keyboard.append([InlineKeyboardButton("« 返回", callback_data='admin_back')])
+        
+        await query.edit_message_text(
+            text,
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode='Markdown'
+        )
+    
+    async def _handle_button_management(self, query, context):
+        """处理按钮管理操作"""
+        data = query.data
+        
+        if data == 'admin_btn_add':
+            await query.edit_message_text(
+                '➕ **添加自定义按钮**\n\n'
+                '请发送按钮信息，格式：\n'
+                '`按钮文字|类型|内容`\n\n'
+                '**类型说明：**\n'
+                '• `message` - 回复消息（支持 Markdown）\n'
+                '• `url` - 跳转链接\n\n'
+                '**示例：**\n'
+                '`使用教程|message|📖 **使用教程**\\n\\n1. 第一步...`\n'
+                '`官方频道|url|https://t.me/yourchannel`',
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("❌ 取消", callback_data='admin_custom_buttons')
+                ]]),
+                parse_mode='Markdown'
+            )
+            context.user_data['admin_waiting_for'] = 'add_custom_button'
+        
+        elif data == 'admin_btn_list':
+            buttons = self.db.get_custom_buttons()
+            
+            text = '📋 **编辑自定义按钮**\n\n选择要编辑的按钮：\n\n'
+            
+            keyboard = []
+            for btn in buttons:
+                keyboard.append([InlineKeyboardButton(
+                    f'{btn["text"]}',
+                    callback_data=f'admin_btn_edit_{btn["id"]}'
+                )])
+            
+            keyboard.append([InlineKeyboardButton("« 返回", callback_data='admin_custom_buttons')])
+            
+            await query.edit_message_text(
+                text,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode='Markdown'
+            )
+        
+        elif data.startswith('admin_btn_edit_'):
+            button_id = int(data.split('_')[3])
+            
+            # 查询按钮信息
+            buttons = self.db.get_custom_buttons()
+            btn = next((b for b in buttons if b['id'] == button_id), None)
+            
+            if not btn:
+                await query.answer('❌ 按钮不存在', show_alert=True)
+                return
+            
+            text = (
+                f'✏️ **编辑按钮**\n\n'
+                f'**按钮文字：** {btn["text"]}\n'
+                f'**类型：** {btn["type"]}\n'
+                f'**内容：**\n{btn["content"]}\n\n'
+                f'选择操作：'
+            )
+            
+            keyboard = [
+                [
+                    InlineKeyboardButton("🔼 上移", callback_data=f'admin_btn_up_{button_id}'),
+                    InlineKeyboardButton("🔽 下移", callback_data=f'admin_btn_down_{button_id}')
+                ],
+                [InlineKeyboardButton("🗑️ 删除", callback_data=f'admin_btn_del_{button_id}')],
+                [InlineKeyboardButton("« 返回", callback_data='admin_btn_list')]
+            ]
+            
+            await query.edit_message_text(
+                text,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode='Markdown'
+            )
+        
+        elif data.startswith('admin_btn_up_') or data.startswith('admin_btn_down_'):
+            direction = 'up' if 'up' in data else 'down'
+            button_id = int(data.split('_')[3])
+            
+            self.db.move_custom_button(button_id, direction)
+            await query.answer(f'✅ 已{"上移" if direction == "up" else "下移"}')
+            
+            # 刷新编辑页面
+            await self._handle_button_management(
+                type('obj', (), {'data': f'admin_btn_edit_{button_id}', 'answer': query.answer, 'edit_message_text': query.edit_message_text})(),
+                context
+            )
+        
+        elif data.startswith('admin_btn_del_'):
+            button_id = int(data.split('_')[3])
+            
+            self.db.delete_custom_button(button_id)
+            await query.answer('✅ 已删除按钮')
+            
+            # 返回按钮列表
+            await self._manage_custom_buttons(query, context)
+    
+    async def handle_add_custom_button(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """处理添加自定义按钮输入"""
+        text = update.message.text.strip()
+        
+        if text.count('|') < 2:
+            await update.message.reply_text(
+                '❌ 格式错误！\n\n'
+                '正确格式：`按钮文字|类型|内容`',
+                parse_mode='Markdown'
+            )
+            return
+        
+        parts = text.split('|', 2)
+        btn_text = parts[0].strip()
+        btn_type = parts[1].strip()
+        btn_content = parts[2].strip()
+        
+        if btn_type not in ['message', 'url']:
+            await update.message.reply_text('❌ 类型必须是 `message` 或 `url`', parse_mode='Markdown')
+            return
+        
+        # 添加按钮
+        self.db.add_custom_button(btn_text, btn_type, btn_content)
+        
+        await update.message.reply_text(
+            f'✅ **按钮已添加**\n\n'
+            f'按钮文字：{btn_text}\n'
+            f'类型：{btn_type}\n'
+            f'内容：{btn_content[:100]}{"..." if len(btn_content) > 100 else ""}',
+            parse_mode='Markdown'
+        )
+        
+        context.user_data['admin_waiting_for'] = None
+    
     async def _edit_start_message(self, query, context):
         """编辑主菜单文案"""
         current_message = self.db.get_setting('start_message')
@@ -613,6 +781,11 @@ class AdminHandler:
             
             # 清除状态
             context.user_data['admin_waiting_for'] = None
+            return True
+        
+        elif waiting_for == 'add_custom_button':
+            # 处理自定义按钮添加
+            await self.handle_add_custom_button(update, context)
             return True
         
         return False
