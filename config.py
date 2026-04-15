@@ -68,8 +68,8 @@ class Config:
     # ============================================
     # 充值配置
     # ============================================
-    # USDT TRC20 收款地址（请替换为你的地址）
-    USDT_RECEIVER_ADDRESS = os.getenv('USDT_RECEIVER_ADDRESS', 'TYourAddressHere')
+    # USDT TRC20 收款地址
+    USDT_RECEIVER_ADDRESS = os.getenv('USDT_RECEIVER_ADDRESS', 'TV77o3KfH8DkQNNEsvDLNo765ABcqr3MnM')
     
     # 最低充值金额（USDT）
     MIN_RECHARGE_AMOUNT = float(os.getenv('MIN_RECHARGE_AMOUNT', '1.0'))
