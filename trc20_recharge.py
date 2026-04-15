@@ -112,23 +112,33 @@ class TRC20Recharge:
     def _get_transaction_info(self, txid: str) -> Dict:
         """获取交易详情"""
         try:
-            # API 请求
-            url = f'{self.TRONGRID_API}/v1/transactions/{txid}'
+            # 方法1：使用 walletsolidity API（更可靠）
+            url = f'{self.TRONGRID_API}/walletsolidity/gettransactionbyid'
             headers = {
-                'Accept': 'application/json'
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            }
+            payload = {
+                'value': txid
             }
             
             print(f'  🔍 查询交易: {url}')
-            response = requests.get(url, headers=headers, timeout=10)
+            response = requests.post(url, json=payload, headers=headers, timeout=10)
             print(f'  📡 HTTP 状态: {response.status_code}')
             
             if response.status_code != 200:
-                # 打印完整响应
-                print(f'  ❌ 响应内容: {response.text[:200]}')
-                return {
-                    'success': False,
-                    'message': f'❌ 查询失败（HTTP {response.status_code}）\n\n可能原因：\n1️⃣ 交易尚未上链（等待几秒后重试）\n2️⃣ TxID 复制错误\n3️⃣ API 暂时不可用\n\n请在浏览器中验证：\nhttps://tronscan.org/#/transaction/{txid}'
-                }
+                # 方法2：尝试另一个端点
+                url2 = f'{self.TRONGRID_API}/wallet/gettransactioninfobyid'
+                response2 = requests.post(url2, json=payload, headers=headers, timeout=10)
+                
+                if response2.status_code == 200:
+                    response = response2
+                else:
+                    print(f'  ❌ 两个端点都失败: {response.status_code}, {response2.status_code}')
+                    return {
+                        'success': False,
+                        'message': f'❌ 查询失败（HTTP {response.status_code}）\n\n可能原因：\n1️⃣ API 暂时不可用\n2️⃣ 交易尚未同步到节点\n\n已在 TronScan 确认存在？请稍后重试'
+                    }
             
             data = response.json()
             
