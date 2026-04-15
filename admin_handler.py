@@ -177,6 +177,40 @@ class AdminHandler:
             await self._start_broadcast(query, context)
         elif data == 'admin_edit_start':
             await self._edit_start_message(query, context)
+        elif data == 'admin_edit_trc20':
+            await self._edit_trc20_address(query, context)
+        elif data == 'admin_edit_start_text':
+            await self._edit_start_text(query, context)
+        elif data == 'admin_back':
+            # 返回管理员主菜单
+            stats = self.db.get_statistics()
+            
+            keyboard = [
+                [
+                    InlineKeyboardButton("👥 用户列表", callback_data='admin_users'),
+                    InlineKeyboardButton("🔧 系统配置", callback_data='admin_settings')
+                ],
+                [
+                    InlineKeyboardButton("📢 群发通知", callback_data='admin_broadcast'),
+                    InlineKeyboardButton("📝 主菜单编辑", callback_data='admin_edit_start')
+                ],
+                [InlineKeyboardButton("🏠 返回主菜单", callback_data='back_main')]
+            ]
+            
+            text = (
+                '🔐 **管理员后台**\n\n'
+                '📊 **平台统计**\n'
+                f'👥 用户总数：`{stats["total_users"]}`\n'
+                f'💰 平台余额：`${stats["total_balance"]:.2f}`\n'
+                f'📈 今日收入：`${stats["today_income"]:.2f}`\n'
+                f'📈 昨日收入：`${stats["yesterday_income"]:.2f}`'
+            )
+            
+            await query.edit_message_text(
+                text,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode='Markdown'
+            )
     
     async def _show_users(self, query, context):
         """显示用户列表"""
@@ -241,16 +275,249 @@ class AdminHandler:
         """开始群发通知"""
         await query.edit_message_text(
             '📢 **群发通知**\n\n'
-            '功能开发中...\n\n'
-            '将支持：\n'
-            '• 图文消息\n'
-            '• 自定义按钮\n'
-            '• 发送进度显示\n'
-            '• 智能间隔防刷屏',
+            '请发送要群发的消息内容：\n\n'
+            '支持：\n'
+            '• 纯文本\n'
+            '• 图片 + 文字说明\n'
+            '• Markdown 格式\n\n'
+            '发送消息后，可添加按钮并预览',
             reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("« 返回", callback_data='admin_back')
+                InlineKeyboardButton("❌ 取消", callback_data='admin_back')
             ]])
         )
+        
+        # 设置状态
+        context.user_data['admin_waiting_for'] = 'broadcast_message'
+        context.user_data['broadcast_data'] = {
+            'text': None,
+            'photo': None,
+            'buttons': []
+        }
+    
+    async def handle_broadcast_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """处理群发消息输入"""
+        broadcast_data = context.user_data.get('broadcast_data', {})
+        
+        # 获取消息内容
+        if update.message.photo:
+            # 图片消息
+            photo = update.message.photo[-1]
+            broadcast_data['photo'] = photo.file_id
+            broadcast_data['text'] = update.message.caption or ''
+        else:
+            # 文本消息
+            broadcast_data['text'] = update.message.text
+        
+        context.user_data['broadcast_data'] = broadcast_data
+        
+        # 显示预览和选项
+        keyboard = [
+            [InlineKeyboardButton("➕ 添加按钮", callback_data='broadcast_add_button')],
+            [InlineKeyboardButton("👁️ 预览消息", callback_data='broadcast_preview')],
+            [InlineKeyboardButton("✅ 确认发送", callback_data='broadcast_confirm')],
+            [InlineKeyboardButton("❌ 取消", callback_data='admin_back')]
+        ]
+        
+        await update.message.reply_text(
+            '✅ **消息已接收**\n\n'
+            '请选择操作：',
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        
+        # 清除等待状态
+        context.user_data['admin_waiting_for'] = None
+    
+    async def handle_broadcast_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """处理群发相关回调"""
+        query = update.callback_query
+        await query.answer()
+        
+        data = query.data
+        
+        if data == 'broadcast_add_button':
+            await query.edit_message_text(
+                '➕ **添加按钮**\n\n'
+                '请发送按钮信息，格式：\n'
+                '`按钮文字|URL`\n\n'
+                '示例：\n'
+                '`访问官网|https://example.com`',
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("❌ 取消", callback_data='broadcast_back')
+                ]]),
+                parse_mode='Markdown'
+            )
+            context.user_data['admin_waiting_for'] = 'broadcast_button'
+        
+        elif data == 'broadcast_preview':
+            await self._preview_broadcast(query, context)
+        
+        elif data == 'broadcast_confirm':
+            await self._send_broadcast(query, context)
+        
+        elif data == 'broadcast_back':
+            # 返回群发选项
+            keyboard = [
+                [InlineKeyboardButton("➕ 添加按钮", callback_data='broadcast_add_button')],
+                [InlineKeyboardButton("👁️ 预览消息", callback_data='broadcast_preview')],
+                [InlineKeyboardButton("✅ 确认发送", callback_data='broadcast_confirm')],
+                [InlineKeyboardButton("❌ 取消", callback_data='admin_back')]
+            ]
+            
+            await query.edit_message_text(
+                '✅ **消息已接收**\n\n'
+                '请选择操作：',
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+    
+    async def handle_broadcast_button(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """处理按钮输入"""
+        text = update.message.text.strip()
+        
+        if '|' not in text:
+            await update.message.reply_text('❌ 格式错误！请使用：`按钮文字|URL`', parse_mode='Markdown')
+            return
+        
+        parts = text.split('|', 1)
+        button_text = parts[0].strip()
+        button_url = parts[1].strip()
+        
+        # 添加按钮
+        broadcast_data = context.user_data.get('broadcast_data', {})
+        if 'buttons' not in broadcast_data:
+            broadcast_data['buttons'] = []
+        
+        broadcast_data['buttons'].append({'text': button_text, 'url': button_url})
+        context.user_data['broadcast_data'] = broadcast_data
+        
+        keyboard = [
+            [InlineKeyboardButton("➕ 继续添加", callback_data='broadcast_add_button')],
+            [InlineKeyboardButton("👁️ 预览消息", callback_data='broadcast_preview')],
+            [InlineKeyboardButton("✅ 确认发送", callback_data='broadcast_confirm')],
+            [InlineKeyboardButton("❌ 取消", callback_data='admin_back')]
+        ]
+        
+        await update.message.reply_text(
+            f'✅ 按钮已添加：{button_text}\n\n'
+            f'当前按钮数：{len(broadcast_data["buttons"])}',
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        
+        context.user_data['admin_waiting_for'] = None
+    
+    async def _preview_broadcast(self, query, context):
+        """预览群发消息"""
+        broadcast_data = context.user_data.get('broadcast_data', {})
+        
+        text = broadcast_data.get('text', '（无文本）')
+        photo = broadcast_data.get('photo')
+        buttons = broadcast_data.get('buttons', [])
+        
+        # 构建按钮
+        keyboard = []
+        for btn in buttons:
+            keyboard.append([InlineKeyboardButton(btn['text'], url=btn['url'])])
+        
+        # 发送预览
+        await query.message.reply_text('📋 **消息预览：**')
+        
+        try:
+            if photo:
+                await query.message.reply_photo(
+                    photo=photo,
+                    caption=text,
+                    reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None,
+                    parse_mode='Markdown'
+                )
+            else:
+                await query.message.reply_text(
+                    text,
+                    reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None,
+                    parse_mode='Markdown'
+                )
+        except Exception as e:
+            await query.message.reply_text(f'❌ 预览失败：{e}')
+    
+    async def _send_broadcast(self, query, context):
+        """发送群发消息"""
+        broadcast_data = context.user_data.get('broadcast_data', {})
+        
+        text = broadcast_data.get('text', '')
+        photo = broadcast_data.get('photo')
+        buttons = broadcast_data.get('buttons', [])
+        
+        # 获取所有用户
+        conn = self.db.get_connection()
+        c = conn.cursor()
+        c.execute('SELECT user_id FROM users')
+        users = c.fetchall()
+        conn.close()
+        
+        total = len(users)
+        success = 0
+        failed = 0
+        
+        # 构建按钮
+        keyboard = []
+        for btn in buttons:
+            keyboard.append([InlineKeyboardButton(btn['text'], url=btn['url'])])
+        
+        # 发送进度消息
+        progress_msg = await query.message.reply_text(
+            f'📤 **开始群发...**\n\n'
+            f'总用户数：{total}\n'
+            f'已发送：0\n'
+            f'失败：0'
+        )
+        
+        # 逐个发送
+        for i, (user_id,) in enumerate(users, 1):
+            try:
+                if photo:
+                    await context.bot.send_photo(
+                        chat_id=user_id,
+                        photo=photo,
+                        caption=text,
+                        reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None,
+                        parse_mode='Markdown'
+                    )
+                else:
+                    await context.bot.send_message(
+                        chat_id=user_id,
+                        text=text,
+                        reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None,
+                        parse_mode='Markdown'
+                    )
+                success += 1
+            except Exception as e:
+                failed += 1
+                print(f'  ⚠️ 发送给用户 {user_id} 失败: {e}')
+            
+            # 每10个用户更新一次进度
+            if i % 10 == 0 or i == total:
+                try:
+                    await progress_msg.edit_text(
+                        f'📤 **群发进度**\n\n'
+                        f'总用户数：{total}\n'
+                        f'已发送：{success}\n'
+                        f'失败：{failed}\n'
+                        f'进度：{i}/{total} ({i*100//total}%)'
+                    )
+                except:
+                    pass
+            
+            # 智能间隔（1-2秒）
+            await asyncio.sleep(1.5)
+        
+        # 完成提示
+        await progress_msg.edit_text(
+            f'✅ **群发完成！**\n\n'
+            f'总用户数：{total}\n'
+            f'成功发送：{success}\n'
+            f'发送失败：{failed}'
+        )
+        
+        # 清除群发数据
+        context.user_data['broadcast_data'] = None
     
     async def _edit_start_message(self, query, context):
         """编辑主菜单文案"""
@@ -260,12 +527,92 @@ class AdminHandler:
             '📝 **主菜单文案编辑**\n\n'
             '**当前文案：**\n'
             f'{current_message}\n\n'
-            '功能开发中...'
+            '点击下方按钮修改文案'
         )
         
-        keyboard = [[InlineKeyboardButton("« 返回", callback_data='admin_back')]]
+        keyboard = [
+            [InlineKeyboardButton("📝 修改文案", callback_data='admin_edit_start_text')],
+            [InlineKeyboardButton("« 返回", callback_data='admin_back')]
+        ]
         
         await query.edit_message_text(
             text,
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
+    
+    async def _edit_trc20_address(self, query, context):
+        """编辑 TRC20 地址"""
+        await query.edit_message_text(
+            '📝 **修改 TRC20 收款地址**\n\n'
+            '请发送新的 TRC20 地址：',
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("❌ 取消", callback_data='admin_settings')
+            ]])
+        )
+        
+        # 设置用户状态
+        context.user_data['admin_waiting_for'] = 'trc20_address'
+    
+    async def _edit_start_text(self, query, context):
+        """编辑主菜单文案"""
+        await query.edit_message_text(
+            '📝 **修改主菜单文案**\n\n'
+            '请发送新的欢迎文案：',
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("❌ 取消", callback_data='admin_edit_start')
+            ]])
+        )
+        
+        # 设置用户状态
+        context.user_data['admin_waiting_for'] = 'start_message'
+    
+    async def handle_admin_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """处理管理员消息（用于接收配置输入）"""
+        user_id = update.effective_user.id
+        
+        if not self.is_admin(user_id):
+            return False
+        
+        waiting_for = context.user_data.get('admin_waiting_for')
+        
+        if not waiting_for:
+            return False
+        
+        text = update.message.text.strip()
+        
+        if waiting_for == 'trc20_address':
+            # 验证 TRC20 地址格式
+            if not text.startswith('T') or len(text) != 34:
+                await update.message.reply_text('❌ TRC20 地址格式错误！地址应以 T 开头，长度为 34 位')
+                return True
+            
+            # 保存地址
+            self.db.set_setting('trc20_address', text)
+            
+            await update.message.reply_text(
+                f'✅ **TRC20 地址已更新**\n\n'
+                f'新地址：`{text}`\n\n'
+                '修改已生效，无需重启',
+                parse_mode='Markdown'
+            )
+            
+            # 清除状态
+            context.user_data['admin_waiting_for'] = None
+            return True
+        
+        elif waiting_for == 'start_message':
+            # 保存欢迎文案
+            self.db.set_setting('start_message', text)
+            
+            await update.message.reply_text(
+                f'✅ **主菜单文案已更新**\n\n'
+                f'新文案：\n{text}\n\n'
+                '修改已生效，用户下次 /start 时将看到新文案',
+                parse_mode='Markdown'
+            )
+            
+            # 清除状态
+            context.user_data['admin_waiting_for'] = None
+            return True
+        
+        return False

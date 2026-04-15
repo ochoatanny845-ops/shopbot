@@ -176,6 +176,9 @@ class SalesBot:
         # 获取余额
         balance = self._get_balance(user.id)
         
+        # 从数据库读取欢迎文案
+        start_message = self.db.get_setting('start_message', '👋 欢迎使用账号购买系统！\n\n🛍 请选择服务：')
+        
         keyboard = [
             [InlineKeyboardButton("📱 Telegram账号", callback_data="show_product_overview")],
             [
@@ -186,10 +189,9 @@ class SalesBot:
         ]
         
         await update.message.reply_text(
-            f"👋 欢迎使用账号购买系统！\n\n"
+            f"{start_message}\n\n"
             f"📱 用户ID：`{user.id}`\n"
-            f"💰 当前余额：**${balance:.2f} USDT**\n\n"
-            f"🛍 请选择服务：",
+            f"💰 当前余额：**${balance:.2f} USDT**",
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode='Markdown'
         )
@@ -208,6 +210,11 @@ class SalesBot:
         # 管理员回调
         if data.startswith('admin_'):
             await self.admin_handler.handle_admin_callback(update, context)
+            return
+        
+        # 群发回调
+        if data.startswith('broadcast_'):
+            await self.admin_handler.handle_broadcast_callback(update, context)
             return
         
         if data == "show_product_overview":
@@ -414,9 +421,23 @@ class SalesBot:
         )
     
     async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """处理文本消息（购买数量 / 充值金额 / TxID验证）"""
+        """处理文本消息（购买数量 / 充值金额 / TxID验证 / 管理员输入）"""
         user_id = update.effective_user.id
         text = update.message.text.strip()
+        
+        # 优先处理管理员输入
+        admin_waiting = context.user_data.get('admin_waiting_for')
+        if admin_waiting:
+            if admin_waiting in ['trc20_address', 'start_message']:
+                handled = await self.admin_handler.handle_admin_message(update, context)
+                if handled:
+                    return
+            elif admin_waiting == 'broadcast_message':
+                await self.admin_handler.handle_broadcast_message(update, context)
+                return
+            elif admin_waiting == 'broadcast_button':
+                await self.admin_handler.handle_broadcast_button(update, context)
+                return
         
         # 优先检查是否是充值流程
         if context.user_data.get('waiting_for') == 'recharge_amount':
@@ -707,6 +728,9 @@ class SalesBot:
         user = query.from_user
         balance = self._get_balance(user.id)
         
+        # 从数据库读取欢迎文案
+        start_message = self.db.get_setting('start_message', '👋 欢迎使用账号购买系统！\n\n🛍 请选择服务：')
+        
         keyboard = [
             [InlineKeyboardButton("📱 Telegram账号", callback_data="show_categories")],
             [
@@ -717,10 +741,9 @@ class SalesBot:
         ]
         
         await query.edit_message_text(
-            f"👋 欢迎使用账号购买系统！\n\n"
+            f"{start_message}\n\n"
             f"📱 用户ID：`{user.id}`\n"
-            f"💰 当前余额：**${balance:.2f} USDT**\n\n"
-            f"🛍 请选择服务：",
+            f"💰 当前余额：**${balance:.2f} USDT**",
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode='Markdown'
         )

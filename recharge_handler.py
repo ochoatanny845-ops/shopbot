@@ -19,15 +19,15 @@ class RechargeHandler:
     
     def __init__(self):
         self.db = Database()
-        # 从 Config 中读取收款地址和 API Key
-        self.recipient_address = Config.USDT_RECEIVER_ADDRESS if hasattr(Config, 'USDT_RECEIVER_ADDRESS') else 'TV77o3KfH8DkQNNEsvDLNo765ABcqr3MnM'
+        # 动态从数据库读取收款地址
         self.api_key = Config.TRONGRID_API_KEY if hasattr(Config, 'TRONGRID_API_KEY') else None
-        
-        # 初始化验证器（传递 API Key）
-        self.verifier = TRC20Recharge(self.recipient_address, self.api_key)
         
         # 初始化 OKPay 处理器
         self.okpay = OKPayHandler() if hasattr(Config, 'OKPAY_SHOP_ID') and Config.OKPAY_SHOP_ID else None
+    
+    def get_recipient_address(self):
+        """动态获取收款地址"""
+        return self.db.get_setting('trc20_address', 'TV77o3KfH8DkQNNEsvDLNo765ABcqr3MnM')
     
     async def handle_recharge_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """处理充值请求 - 选择充值方式"""
@@ -255,9 +255,12 @@ class RechargeHandler:
         """发送支付信息，返回消息 ID 列表"""
         message_ids = []  # 记录所有消息 ID，用于后续删除
         
+        # 动态获取收款地址
+        recipient_address = self.get_recipient_address()
+        
         # 生成二维码
         qr = qrcode.QRCode(version=1, box_size=10, border=2)
-        qr.add_data(self.recipient_address)
+        qr.add_data(recipient_address)
         qr.make(fit=True)
         
         img = qr.make_image(fill_color="black", back_color="white")
@@ -277,7 +280,7 @@ class RechargeHandler:
             f'💰 **充值订单 #{order_id}**\n\n'
             f'充值金额：`{amount}` USDT\n'
             f'网络类型：TRC20 (Tron)\n'
-            f'收款地址：\n`{self.recipient_address}`\n\n'
+            f'收款地址：\n`{recipient_address}`\n\n'
             f'⏰ **订单时间：**\n'
             f'创建时间：{now.strftime("%Y-%m-%d %H:%M:%S")}\n'
             f'过期时间：{expire_time.strftime("%Y-%m-%d %H:%M:%S")}\n'
@@ -390,8 +393,14 @@ class RechargeHandler:
         max_retries = max_wait_time // retry_interval  # 12 次
         
         for attempt in range(max_retries):
+            # 动态获取收款地址
+            recipient_address = self.get_recipient_address()
+            
+            # 初始化验证器
+            verifier = TRC20Recharge(recipient_address, self.api_key)
+            
             # 验证交易
-            result = self.verifier.verify_transaction(txid, expected_amount)
+            result = verifier.verify_transaction(txid, expected_amount)
             
             if result['success']:
                 # 验证通过，入账
