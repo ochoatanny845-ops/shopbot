@@ -81,13 +81,13 @@ class MultiSourceScraper:
     async def _get_categories(self, client, source_bot, purchaser):
         """获取分类列表（使用购买器导航）"""
         # @hao24bot: 发送 🏠主菜单 → 点击"账号列表"
-        # @SanJianbot: 直接点击 🛒 商品分类
+        # @SanJianbot: 发送 🏠主菜单 → 点击 🛒 商品分类
+        
+        # 首次同步：发送 🏠主菜单
+        await client.send_message(source_bot, '🏠主菜单')
+        await asyncio.sleep(2)
         
         if source_bot == '@hao24bot':
-            # 发送 🏠主菜单
-            await client.send_message(source_bot, '🏠主菜单')
-            await asyncio.sleep(2)
-            
             # 点击"账号列表"
             msgs = await client.get_messages(source_bot, limit=1)
             if msgs and msgs[0].buttons:
@@ -109,7 +109,7 @@ class MultiSourceScraper:
                             await asyncio.sleep(2)
                             break
         
-        # 获取分类按钮
+        # 获取分类按钮（分类列表页面）
         msgs = await client.get_messages(source_bot, limit=1)
         if not msgs or not msgs[0].buttons:
             return []
@@ -117,8 +117,13 @@ class MultiSourceScraper:
         categories = []
         for row in msgs[0].buttons:
             for btn in row:
+                # 过滤掉底部按钮（主菜单、返回等）
                 if btn.text and btn.text not in ['🏠主菜单', '🏠 主菜单', '⬅️ 返回', '↩️返回']:
-                    categories.append(btn.text.strip())
+                    # @SanJianbot 的分类按钮格式：Tdata直登号、Tdata直登号(3-8月) 等
+                    # @hao24bot 的分类按钮格式：🌏 亚洲国家 可用数量【64494】等
+                    # 排除包含emoji国旗的商品按钮（🇺🇿、🇨🇴等）
+                    if not any(char in btn.text for char in ['🇦', '🇧', '🇨', '🇩', '🇪', '🇫', '🇬', '🇭', '🇮', '🇯', '🇰', '🇱', '🇲', '🇳', '🇴', '🇵', '🇶', '🇷', '🇸', '🇹', '🇺', '🇻', '🇼', '🇽', '🇾', '🇿']):
+                        categories.append(btn.text.strip())
         
         return categories
     
