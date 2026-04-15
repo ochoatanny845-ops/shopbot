@@ -104,6 +104,23 @@ class Database:
             )
         ''')
         
+        # 系统配置表
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # 初始化默认配置
+        c.execute('''
+            INSERT OR IGNORE INTO settings (key, value, updated_at)
+            VALUES 
+                ('trc20_address', 'TV77o3KfH8DkQNNEsvDLNo765ABcqr3MnM', datetime('now')),
+                ('start_message', '👋 欢迎使用账号购买系统！\n\n🛍 请选择服务：', datetime('now'))
+        ''')
+        
         conn.commit()
         conn.close()
         
@@ -111,3 +128,65 @@ class Database:
         if not Database._initialized:
             print('✅ 数据库初始化完成')
             Database._initialized = True
+    
+    def get_setting(self, key: str, default: str = None) -> str:
+        """获取配置项"""
+        conn = self.get_connection()
+        c = conn.cursor()
+        
+        c.execute('SELECT value FROM settings WHERE key = ?', (key,))
+        result = c.fetchone()
+        conn.close()
+        
+        return result[0] if result else default
+    
+    def set_setting(self, key: str, value: str):
+        """设置配置项"""
+        conn = self.get_connection()
+        c = conn.cursor()
+        
+        c.execute('''
+            INSERT OR REPLACE INTO settings (key, value, updated_at)
+            VALUES (?, ?, datetime('now'))
+        ''', (key, value))
+        
+        conn.commit()
+        conn.close()
+    
+    def get_statistics(self) -> dict:
+        """获取平台统计数据"""
+        conn = self.get_connection()
+        c = conn.cursor()
+        
+        # 用户总数
+        c.execute('SELECT COUNT(*) FROM users')
+        total_users = c.fetchone()[0]
+        
+        # 平台余额
+        c.execute('SELECT SUM(balance) FROM users')
+        total_balance = c.fetchone()[0] or 0
+        
+        # 今日收入
+        c.execute('''
+            SELECT SUM(amount) FROM balance_logs
+            WHERE type = 'recharge'
+            AND date(created_at) = date('now')
+        ''')
+        today_income = c.fetchone()[0] or 0
+        
+        # 昨日收入
+        c.execute('''
+            SELECT SUM(amount) FROM balance_logs
+            WHERE type = 'recharge'
+            AND date(created_at) = date('now', '-1 day')
+        ''')
+        yesterday_income = c.fetchone()[0] or 0
+        
+        conn.close()
+        
+        return {
+            'total_users': total_users,
+            'total_balance': total_balance,
+            'today_income': today_income,
+            'yesterday_income': yesterday_income
+        }

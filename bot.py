@@ -7,6 +7,7 @@ from telegram.ext import Application, CommandHandler, CallbackQueryHandler, Mess
 from config import Config
 from database import Database
 from recharge_handler import RechargeHandler
+from admin_handler import AdminHandler
 
 class SalesBot:
     """销售机器人"""
@@ -17,6 +18,7 @@ class SalesBot:
         self.app = None
         self.user_states = {}  # 用户状态管理
         self.recharge_handler = RechargeHandler()  # 充值处理器
+        self.admin_handler = AdminHandler()  # 管理员处理器
     
     def build_app(self):
         """构建应用（不启动）"""
@@ -26,6 +28,8 @@ class SalesBot:
         self.app.add_handler(CommandHandler("start", self.cmd_start))
         self.app.add_handler(CommandHandler("add", self.cmd_add_balance))
         self.app.add_handler(CommandHandler("recharge", self.cmd_recharge))  # 充值命令
+        self.app.add_handler(CommandHandler("admin", self.admin_handler.cmd_admin))  # 管理员后台
+        self.app.add_handler(CommandHandler("cha", self.admin_handler.cmd_cha))  # 查询用户
         self.app.add_handler(CallbackQueryHandler(self.handle_callback))
         self.app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message))
         
@@ -200,6 +204,11 @@ class SalesBot:
         await query.answer()
         
         data = query.data
+        
+        # 管理员回调
+        if data.startswith('admin_'):
+            await self.admin_handler.handle_admin_callback(update, context)
+            return
         
         if data == "show_product_overview":
             await self._show_product_overview(query)
