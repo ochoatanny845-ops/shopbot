@@ -3,9 +3,11 @@
 验证收款地址是否有效
 """
 from trc20_recharge import TRC20Recharge
+from config import Config
 
-# 你的收款地址
-RECIPIENT_ADDRESS = 'TV77o3KfH8DkQNNEsvDLNo765ABcqr3MnM'
+# 从配置文件读取
+RECIPIENT_ADDRESS = Config.USDT_RECEIVER_ADDRESS
+API_KEY = Config.TRONGRID_API_KEY if hasattr(Config, 'TRONGRID_API_KEY') else None
 
 print('='*60)
 print('🔍 测试 USDT TRC20 充值验证功能')
@@ -14,9 +16,10 @@ print('='*60)
 print(f'\n收款地址: {RECIPIENT_ADDRESS}')
 print(f'地址长度: {len(RECIPIENT_ADDRESS)} 字符')
 print(f'地址格式: {"✅ 正确 (T 开头)" if RECIPIENT_ADDRESS.startswith("T") else "❌ 错误"}')
+print(f'API Key: {"✅ 已配置" if API_KEY else "⚠️ 未配置（使用免费版）"}')
 
 # 创建验证器
-verifier = TRC20Recharge(RECIPIENT_ADDRESS)
+verifier = TRC20Recharge(RECIPIENT_ADDRESS, API_KEY)
 print('\n✅ 验证器初始化成功')
 
 print('\n' + '='*60)

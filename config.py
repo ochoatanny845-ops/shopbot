@@ -74,6 +74,9 @@ class Config:
     # 最低充值金额（USDT）
     MIN_RECHARGE_AMOUNT = float(os.getenv('MIN_RECHARGE_AMOUNT', '1.0'))
     
+    # TronGrid API Key（可选，免费版留空）
+    TRONGRID_API_KEY = os.getenv('TRONGRID_API_KEY', '')
+    
     # ============================================
     # 日志配置
     # ============================================

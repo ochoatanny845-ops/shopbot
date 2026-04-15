@@ -17,9 +17,12 @@ class RechargeHandler:
     
     def __init__(self):
         self.db = Database()
-        # TODO: 从 Config 中读取收款地址
-        self.recipient_address = Config.USDT_RECEIVER_ADDRESS if hasattr(Config, 'USDT_RECEIVER_ADDRESS') else 'TYourAddressHere'
-        self.verifier = TRC20Recharge(self.recipient_address)
+        # 从 Config 中读取收款地址和 API Key
+        self.recipient_address = Config.USDT_RECEIVER_ADDRESS if hasattr(Config, 'USDT_RECEIVER_ADDRESS') else 'TV77o3KfH8DkQNNEsvDLNo765ABcqr3MnM'
+        self.api_key = Config.TRONGRID_API_KEY if hasattr(Config, 'TRONGRID_API_KEY') else None
+        
+        # 初始化验证器（传递 API Key）
+        self.verifier = TRC20Recharge(self.recipient_address, self.api_key)
     
     async def handle_recharge_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """处理充值请求"""

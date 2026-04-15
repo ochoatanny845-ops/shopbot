@@ -14,14 +14,16 @@ class TRC20Recharge:
     # TronGrid API
     TRONGRID_API = 'https://api.trongrid.io'
     
-    def __init__(self, recipient_address: str):
+    def __init__(self, recipient_address: str, api_key: str = None):
         """
         初始化
         
         Args:
             recipient_address: 收款地址（Base58 格式，T 开头）
+            api_key: TronGrid API Key（可选，提升速率限制）
         """
         self.recipient_address = recipient_address
+        self.api_key = api_key
     
     def verify_transaction(self, txid: str, expected_amount: float) -> Dict:
         """
@@ -118,6 +120,12 @@ class TRC20Recharge:
                 'Accept': 'application/json',
                 'Content-Type': 'application/json'
             }
+            
+            # 如果有 API Key，添加到 header
+            if self.api_key:
+                headers['TRON-PRO-API-KEY'] = self.api_key
+                print(f'  🔑 使用 TronGrid API Key: {self.api_key[:8]}...')
+            
             payload = {
                 'value': txid
             }
