@@ -192,8 +192,46 @@ class RechargeHandler:
         # 开始验证
         msg = await update.message.reply_text('🔍 正在验证交易，请稍候...')
         
-        # 验证交易
-        result = self.verifier.verify_transaction(txid, expected_amount)
+        # 自动重试机制（等待交易上链）
+        max_retries = 3
+        retry_delay = 5  # 秒
+        
+        for attempt in range(max_retries):
+            # 验证交易
+            result = self.verifier.verify_transaction(txid, expected_amount)
+            
+            if result['success']:
+                # 验证通过，入账
+                break
+            
+            # 如果是"交易不存在"错误，等待后重试
+            if '交易不存在' in result.get('message', '') or '尚未上链' in result.get('message', ''):
+                if attempt < max_retries - 1:
+                    await msg.edit_text(
+                        f'⏳ 交易正在上链中...\n\n'
+                        f'已尝试 {attempt + 1}/{max_retries} 次\n'
+                        f'等待 {retry_delay} 秒后重试...\n\n'
+                        f'💡 Tron 网络通常需要 3-10 秒确认'
+                    )
+                    import asyncio
+                    await asyncio.sleep(retry_delay)
+                else:
+                    # 最后一次失败，给出提示
+                    await msg.edit_text(
+                        f'⏳ **交易尚未上链**\n\n'
+                        f'已尝试 {max_retries} 次验证\n\n'
+                        f'💡 **请稍后再试：**\n'
+                        f'1️⃣ 等待 10-30 秒\n'
+                        f'2️⃣ 重新发送此交易哈希\n'
+                        f'3️⃣ 在浏览器中确认交易状态：\n'
+                        f'https://tronscan.org/#/transaction/{txid}\n\n'
+                        f'交易哈希：`{txid}`',
+                        parse_mode='Markdown'
+                    )
+                    return
+            else:
+                # 其他错误，直接返回
+                break
         
         if result['success']:
             # 验证通过，入账
