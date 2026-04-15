@@ -213,7 +213,7 @@ class RechargeHandler:
             c.execute('''
                 UPDATE users
                 SET balance = balance + ?
-                WHERE telegram_id = ?
+                WHERE user_id = ?
             ''', (actual_amount, user_id))
             
             conn.commit()
@@ -243,7 +243,7 @@ class RechargeHandler:
         conn = self.db.get_connection()
         c = conn.cursor()
         
-        c.execute('SELECT balance FROM users WHERE telegram_id = ?', (user_id,))
+        c.execute('SELECT balance FROM users WHERE user_id = ?', (user_id,))
         result = c.fetchone()
         conn.close()
         
