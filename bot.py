@@ -354,9 +354,18 @@ class SalesBot:
         for cat, stock in categories:
             # 如果指定了来源，callback_data 包含来源信息
             if source_name:
-                callback_data = f"cat_{source_name}_{cat}"
+                # 限制长度：Telegram callback_data 最多 64 字节
+                source_short = source_name[:10]  # 来源名截断到 10 字符
+                cat_short = cat[:30]  # 分类名截断到 30 字符
+                callback_data = f"cat_{source_short}_{cat_short}"
+                # 确保不超过 64 字节
+                if len(callback_data.encode('utf-8')) > 64:
+                    callback_data = callback_data.encode('utf-8')[:64].decode('utf-8', errors='ignore')
             else:
                 callback_data = f"cat_{cat}"
+                # 确保不超过 64 字节
+                if len(callback_data.encode('utf-8')) > 64:
+                    callback_data = callback_data.encode('utf-8')[:60].decode('utf-8', errors='ignore')
             
             keyboard.append([InlineKeyboardButton(
                 f"{cat} 【{stock}】",
