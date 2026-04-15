@@ -21,6 +21,12 @@ class MultiSourceScraper:
         print()
         
         for source in Config.PRODUCT_SOURCES:
+            # 🔧 临时：只同步 @SanJianbot
+            if source['source_bot'] != '@SanJianbot':
+                print(f'⏭️ 跳过来源: {source["name"]}')
+                print()
+                continue
+            
             print(f'📱 同步来源: {source["name"]}')
             print(f'   源机器人: {source["source_bot"]}')
             print(f'   Session: {source["session"]}')
