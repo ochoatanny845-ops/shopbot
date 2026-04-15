@@ -180,6 +180,33 @@ class RechargeHandler:
         
         order_id, expected_amount, order_created_at = order
         
+        # 🕐 检查订单是否过期（10 分钟有效期）
+        from datetime import datetime
+        order_time = datetime.fromisoformat(order_created_at)
+        current_time = datetime.now()
+        time_elapsed = (current_time - order_time).total_seconds()
+        
+        if time_elapsed > 600:  # 10 分钟 = 600 秒
+            # 订单已过期，标记为失效
+            c.execute('''
+                UPDATE recharge_orders
+                SET status = 'expired'
+                WHERE id = ?
+            ''', (order_id,))
+            conn.commit()
+            conn.close()
+            
+            await update.message.reply_text(
+                f'⏰ **充值订单已过期**\n\n'
+                f'订单创建时间：{order_created_at}\n'
+                f'当前时间：{current_time.isoformat()}\n'
+                f'已过去：{time_elapsed / 60:.1f} 分钟\n\n'
+                f'⚠️ 充值订单有效期：10 分钟\n'
+                f'请重新点击"充值余额"发起新订单',
+                parse_mode='Markdown'
+            )
+            return
+        
         # 检查 TxID 是否已被使用
         c.execute('SELECT id FROM recharge_orders WHERE txid = ?', (txid,))
         if c.fetchone():
@@ -260,13 +287,13 @@ class RechargeHandler:
                 )
                 return
             
-            if time_diff > 1800:  # 订单创建后 30 分钟
+            if time_diff > 600:  # 订单创建后 10 分钟（改为 10 分钟）
                 await msg.edit_text(
                     f'⏰ **订单已超时**\n\n'
                     f'订单创建时间：{order_created_at}\n'
                     f'交易时间：{datetime.fromtimestamp(tx_timestamp).isoformat()}\n'
                     f'时间差：{time_diff / 60:.1f} 分钟\n\n'
-                    f'⚠️ 充值订单有效期：30 分钟\n'
+                    f'⚠️ 充值订单有效期：10 分钟\n'
                     f'请重新发起充值',
                     parse_mode='Markdown'
                 )
