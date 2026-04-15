@@ -37,6 +37,22 @@ class Config:
     BUYER_2FA = os.getenv('BUYER_2FA', '')
     
     # ============================================
+    # 多商品来源配置
+    # ============================================
+    PRODUCT_SOURCES = [
+        {
+            'name': 'TG💎直登+协议+api 百万库存',
+            'source_bot': '@hao24bot',
+            'session': 'sessions/buyer_account'
+        },
+        {
+            'name': '🔥 TG高质量协议号直登号',
+            'source_bot': '@SanJianbot',
+            'session': 'sessions/buyer_account_2'
+        }
+    ]
+    
+    # ============================================
     # 定价配置
     # ============================================
     # 固定加价（美元）

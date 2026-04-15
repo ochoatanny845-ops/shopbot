@@ -239,11 +239,20 @@ class SalesBot:
         
         if data == "show_product_overview":
             await self._show_product_overview(query)
+        elif data.startswith("source_"):
+            source_name = data[7:]
+            await self._show_categories(query, source_name)
         elif data == "show_categories":
             await self._show_categories(query)
         elif data.startswith("cat_"):
-            category = data[4:]
-            await self._show_products(query, category)
+            # 解析来源和分类
+            parts = data[4:].split('_', 1)
+            if len(parts) == 2:
+                source_name, category = parts
+                await self._show_products(query, category, source_name)
+            else:
+                category = parts[0]
+                await self._show_products(query, category)
         elif data.startswith("buy_"):
             product_id = int(data[4:])
             await self._buy_product(query, product_id)
@@ -269,28 +278,32 @@ class SalesBot:
             await self._back_to_main(query)
     
     async def _show_product_overview(self, query):
-        """显示商品总览（中间层）"""
-        # 统计总库存
+        """显示商品总览（按来源分组）"""
         conn = self.db.get_connection()
         c = conn.cursor()
         
+        # 按来源分组统计库存
         c.execute('''
-            SELECT SUM(stock) as total_stock
+            SELECT source_name, SUM(stock) as total_stock
             FROM products
             WHERE is_active = 1 AND stock > 0
+            GROUP BY source_name
+            HAVING total_stock > 0
         ''')
         
-        result = c.fetchone()
-        total_stock = result[0] if result and result[0] else 0
+        sources = c.fetchall()
         conn.close()
         
-        keyboard = [
-            [InlineKeyboardButton(
-                f"TG💎直登+协议+api 百万库存 ({total_stock}个)",
-                callback_data="show_categories"
-            )],
-            [InlineKeyboardButton("🏠 返回主菜单", callback_data="back_main")]
-        ]
+        keyboard = []
+        
+        # 为每个来源创建按钮
+        for source_name, stock in sources:
+            keyboard.append([InlineKeyboardButton(
+                f"{source_name} ({stock}个)",
+                callback_data=f"source_{source_name}"
+            )])
+        
+        keyboard.append([InlineKeyboardButton("🏠 返回主菜单", callback_data="back_main")])
         
         await query.edit_message_text(
             "📱 **Telegram账号商品**\n\n"
@@ -299,19 +312,31 @@ class SalesBot:
             parse_mode='Markdown'
         )
     
-    async def _show_categories(self, query):
-        """显示分类列表"""
+    async def _show_categories(self, query, source_name=None):
+        """显示分类列表（支持按来源过滤）"""
         conn = self.db.get_connection()
         c = conn.cursor()
         
-        c.execute('''
-            SELECT category, SUM(stock) as total_stock
-            FROM products
-            WHERE is_active = 1 AND stock > 0
-            GROUP BY category
-            HAVING total_stock > 0
-            ORDER BY category
-        ''')
+        if source_name:
+            # 指定来源的分类
+            c.execute('''
+                SELECT category, SUM(stock) as total_stock
+                FROM products
+                WHERE is_active = 1 AND stock > 0 AND source_name = ?
+                GROUP BY category
+                HAVING total_stock > 0
+                ORDER BY category
+            ''', (source_name,))
+        else:
+            # 所有来源的分类（向后兼容）
+            c.execute('''
+                SELECT category, SUM(stock) as total_stock
+                FROM products
+                WHERE is_active = 1 AND stock > 0
+                GROUP BY category
+                HAVING total_stock > 0
+                ORDER BY category
+            ''')
         
         categories = c.fetchall()
         conn.close()
@@ -327,9 +352,15 @@ class SalesBot:
         
         keyboard = []
         for cat, stock in categories:
+            # 如果指定了来源，callback_data 包含来源信息
+            if source_name:
+                callback_data = f"cat_{source_name}_{cat}"
+            else:
+                callback_data = f"cat_{cat}"
+            
             keyboard.append([InlineKeyboardButton(
                 f"{cat} 【{stock}】",
-                callback_data=f"cat_{cat}"
+                callback_data=callback_data
             )])
         
         keyboard.append([InlineKeyboardButton("⬅️ 返回上级", callback_data="show_product_overview")])
@@ -339,18 +370,27 @@ class SalesBot:
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
     
-    async def _show_products(self, query, category):
-        """显示商品列表"""
+    async def _show_products(self, query, category, source_name=None):
+        """显示商品列表（支持按来源过滤）"""
         conn = self.db.get_connection()
         c = conn.cursor()
         
-        c.execute('''
-            SELECT id, name, selling_price, stock
-            FROM products
-            WHERE category = ? AND is_active = 1 AND stock > 0
-            ORDER BY selling_price
-            LIMIT 50
-        ''', (category,))
+        if source_name:
+            c.execute('''
+                SELECT id, name, selling_price, stock
+                FROM products
+                WHERE category = ? AND is_active = 1 AND stock > 0 AND source_name = ?
+                ORDER BY selling_price
+                LIMIT 50
+            ''', (category, source_name))
+        else:
+            c.execute('''
+                SELECT id, name, selling_price, stock
+                FROM products
+                WHERE category = ? AND is_active = 1 AND stock > 0
+                ORDER BY selling_price
+                LIMIT 50
+            ''', (category,))
         
         products = c.fetchall()
         conn.close()
@@ -526,6 +566,17 @@ class SalesBot:
         
         order_id = c.lastrowid
         
+        # 查询商品的来源信息
+        c.execute('''
+            SELECT source_bot, buyer_session
+            FROM products
+            WHERE id = ?
+        ''', (state['product_id'],))
+        
+        product_source = c.fetchone()
+        source_bot = product_source[0] if product_source and product_source[0] else Config.SOURCE_BOT
+        buyer_session = product_source[1] if product_source and product_source[1] else Config.BUYER_SESSION
+        
         # 扣除余额
         new_balance = balance - total_price
         c.execute('UPDATE users SET balance = ? WHERE user_id = ?', (new_balance, user_id))
@@ -552,13 +603,15 @@ class SalesBot:
             f"正在自动代购，请稍候..."
         )
         
-        # 调用代购模块（传递 user_id 和 order_id 用于隔离）
+        # 调用代购模块（传递来源信息）
         try:
             files = await self.purchaser.purchase(
                 product_id=state['product_id'],
                 quantity=quantity,
                 user_id=user_id,
-                order_id=order_id
+                order_id=order_id,
+                source_bot=source_bot,
+                buyer_session=buyer_session
             )
             
             # 更新订单状态
