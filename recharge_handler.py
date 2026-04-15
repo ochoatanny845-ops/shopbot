@@ -239,9 +239,10 @@ class RechargeHandler:
         # 开始验证
         msg = await update.message.reply_text('🔍 正在验证交易，请稍候...')
         
-        # 自动重试机制（等待交易上链）
-        max_retries = 3
-        retry_delay = 5  # 秒
+        # 静默重试机制（最多等待 120 秒）
+        max_wait_time = 120  # 秒
+        retry_interval = 10  # 每 10 秒检查一次
+        max_retries = max_wait_time // retry_interval  # 12 次
         
         for attempt in range(max_retries):
             # 验证交易
@@ -251,28 +252,25 @@ class RechargeHandler:
                 # 验证通过，入账
                 break
             
-            # 如果是"交易不存在"错误，等待后重试
+            # 如果是"交易不存在"错误，静默等待后重试
             if '交易不存在' in result.get('message', '') or '尚未上链' in result.get('message', ''):
                 if attempt < max_retries - 1:
-                    await msg.edit_text(
-                        f'⏳ 交易正在上链中...\n\n'
-                        f'已尝试 {attempt + 1}/{max_retries} 次\n'
-                        f'等待 {retry_delay} 秒后重试...\n\n'
-                        f'💡 Tron 网络通常需要 3-10 秒确认'
-                    )
+                    # 静默等待，不提示用户
                     import asyncio
-                    await asyncio.sleep(retry_delay)
+                    await asyncio.sleep(retry_interval)
                 else:
-                    # 最后一次失败，给出提示
+                    # 120 秒后仍失败，提示用户
                     await msg.edit_text(
-                        f'⏳ **交易尚未上链**\n\n'
-                        f'已尝试 {max_retries} 次验证\n\n'
-                        f'💡 **请稍后再试：**\n'
-                        f'1️⃣ 等待 10-30 秒\n'
-                        f'2️⃣ 重新发送此交易哈希\n'
-                        f'3️⃣ 在浏览器中确认交易状态：\n'
+                        f'⏳ **交易验证超时**\n\n'
+                        f'已等待 {max_wait_time} 秒，交易仍未上链\n\n'
+                        f'💡 **可能的原因：**\n'
+                        f'1️⃣ 网络拥堵，交易确认较慢\n'
+                        f'2️⃣ 交易哈希复制错误\n'
+                        f'3️⃣ 使用了错误的网络（非 TRC20）\n\n'
+                        f'🔍 **请检查：**\n'
+                        f'在浏览器中确认交易状态：\n'
                         f'https://tronscan.org/#/transaction/{txid}\n\n'
-                        f'交易哈希：`{txid}`',
+                        f'如交易已确认，请稍后重新发送此 TxID',
                         parse_mode='Markdown'
                     )
                     return
