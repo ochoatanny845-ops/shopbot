@@ -3,6 +3,8 @@ USDT TRC20 充值验证模块
 """
 import requests
 import time
+import base58
+import hashlib
 from typing import Optional, Dict
 
 class TRC20Recharge:
@@ -221,22 +223,29 @@ class TRC20Recharge:
     
     def _hex_to_base58(self, hex_address: str) -> str:
         """将十六进制地址转为 Base58（Tron 地址格式）"""
-        # 简化版本：如果已经是 Base58，直接返回
+        # 如果已经是 Base58（T 开头），直接返回
         if hex_address.startswith('T'):
             return hex_address
         
-        # 完整实现需要 base58 库，这里使用 TronGrid API 转换
         try:
-            url = f'{self.TRONGRID_API}/wallet/validateaddress'
-            response = requests.post(url, json={'address': hex_address}, timeout=5)
-            data = response.json()
+            # 移除 0x 前缀（如果有）
+            if hex_address.startswith('0x'):
+                hex_address = hex_address[2:]
             
-            if data.get('result'):
-                return hex_address  # 已经是有效地址
+            # 转为字节
+            addr_bytes = bytes.fromhex(hex_address)
             
-            # 如果是 hex，需要转换（这里简化处理）
-            return hex_address
-        except:
+            # 计算校验和（双重 SHA256）
+            hash0 = hashlib.sha256(addr_bytes).digest()
+            hash1 = hashlib.sha256(hash0).digest()
+            checksum = hash1[:4]
+            
+            # Base58 编码
+            base58_addr = base58.b58encode(addr_bytes + checksum).decode('utf-8')
+            
+            return base58_addr
+        except Exception as e:
+            print(f'  ⚠️ 地址转换失败: {e}')
             return hex_address
     
     def _is_trc20_transfer(self, tx_info: Dict) -> bool:
