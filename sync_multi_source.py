@@ -6,6 +6,7 @@ import asyncio
 from telethon import TelegramClient
 from config import Config
 from database import Database
+from purchasers import PurchaserFactory
 import re
 
 class MultiSourceScraper:
@@ -45,83 +46,86 @@ class MultiSourceScraper:
         try:
             await client.start()
             
-            # 发送 🏠主菜单 获取主菜单
-            await client.send_message(source_bot, '🏠主菜单')
-            await asyncio.sleep(2)
+            # 🎯 创建对应的购买器（用于导航）
+            purchaser = PurchaserFactory.create(source_bot, client)
             
-            # 点击"商品分类"或"账号列表"
-            msgs = await client.get_messages(source_bot, limit=1)
-            if not msgs or not msgs[0].buttons:
-                raise Exception('未找到商品入口按钮')
-            
-            for row in msgs[0].buttons:
-                for btn in row:
-                    # @SanJianbot 用 "商品分类"，@hao24bot 用 "账号列表"
-                    if '商品分类' in btn.text or '账号列表' in btn.text or '🛒' in btn.text:
-                        await btn.click()
-                        await asyncio.sleep(2)
-                        break
-            
-            # 获取所有分类
-            msgs = await client.get_messages(source_bot, limit=1)
-            if not msgs or not msgs[0].buttons:
-                raise Exception('未找到分类按钮')
-            
-            categories = []
-            for row in msgs[0].buttons:
-                for btn in row:
-                    if btn.text and btn.text not in ['🏠主菜单', '⬅️ 返回']:
-                        categories.append(btn.text.strip())
-            
-            print(f'   找到 {len(categories)} 个分类: {categories}')
+            # 获取分类列表
+            categories = await self._get_categories(client, source_bot, purchaser)
+            print(f'   找到 {len(categories)} 个分类')
             
             # 遍历每个分类
             total_products = 0
             for category in categories:
-                products = await self._scrape_category(client, source_bot, category)
-                
-                # 保存商品到数据库
-                for p in products:
-                    self._save_product(
-                        source_name=source_name,
-                        source_bot=source_bot,
-                        buyer_session=session_path,
-                        **p
-                    )
-                
-                total_products += len(products)
-                print(f'      {category}: {len(products)} 个商品')
+                try:
+                    products = await self._scrape_category(client, source_bot, purchaser, category)
+                    
+                    # 保存商品到数据库
+                    for p in products:
+                        self._save_product(
+                            source_name=source_name,
+                            source_bot=source_bot,
+                            buyer_session=session_path,
+                            **p
+                        )
+                    
+                    total_products += len(products)
+                    print(f'      {category}: {len(products)} 个商品')
+                except Exception as e:
+                    print(f'      {category}: 抓取失败 - {e}')
             
             print(f'   总计: {total_products} 个商品')
             
         finally:
             await client.disconnect()
     
-    async def _scrape_category(self, client, source_bot, category):
+    async def _get_categories(self, client, source_bot, purchaser):
+        """获取分类列表（使用购买器导航）"""
+        # @hao24bot: 发送 🏠主菜单 → 点击"账号列表"
+        # @SanJianbot: 直接点击 🛒 商品分类
+        
+        if source_bot == '@hao24bot':
+            # 发送 🏠主菜单
+            await client.send_message(source_bot, '🏠主菜单')
+            await asyncio.sleep(2)
+            
+            # 点击"账号列表"
+            msgs = await client.get_messages(source_bot, limit=1)
+            if msgs and msgs[0].buttons:
+                for row in msgs[0].buttons:
+                    for btn in row:
+                        if '账号列表' in btn.text or '🛒' in btn.text:
+                            await btn.click()
+                            await asyncio.sleep(2)
+                            break
+        
+        elif source_bot == '@SanJianbot':
+            # 点击 🛒 商品分类
+            msgs = await client.get_messages(source_bot, limit=1)
+            if msgs and msgs[0].buttons:
+                for row in msgs[0].buttons:
+                    for btn in row:
+                        if '商品分类' in btn.text or '🛒' in btn.text:
+                            await btn.click()
+                            await asyncio.sleep(2)
+                            break
+        
+        # 获取分类按钮
+        msgs = await client.get_messages(source_bot, limit=1)
+        if not msgs or not msgs[0].buttons:
+            return []
+        
+        categories = []
+        for row in msgs[0].buttons:
+            for btn in row:
+                if btn.text and btn.text not in ['🏠主菜单', '🏠 主菜单', '⬅️ 返回', '↩️返回']:
+                    categories.append(btn.text.strip())
+        
+        return categories
+    
+    async def _scrape_category(self, client, source_bot, purchaser, category):
         """抓取单个分类的商品"""
-        # 返回主菜单
-        await client.send_message(source_bot, '🏠主菜单')
-        await asyncio.sleep(2)
-        
-        # 点击商品分类或账号列表
-        msgs = await client.get_messages(source_bot, limit=1)
-        if msgs and msgs[0].buttons:
-            for row in msgs[0].buttons:
-                for btn in row:
-                    if '商品分类' in btn.text or '账号列表' in btn.text or '🛒' in btn.text:
-                        await btn.click()
-                        await asyncio.sleep(2)
-                        break
-        
-        # 点击分类
-        msgs = await client.get_messages(source_bot, limit=1)
-        if msgs and msgs[0].buttons:
-            for row in msgs[0].buttons:
-                for btn in row:
-                    if category in btn.text:
-                        await btn.click()
-                        await asyncio.sleep(2)
-                        break
+        # 使用购买器导航到分类
+        await purchaser.navigate_to_category(category)
         
         # 获取商品列表
         msgs = await client.get_messages(source_bot, limit=1)
@@ -131,7 +135,7 @@ class MultiSourceScraper:
         products = []
         for row in msgs[0].buttons:
             for btn in row:
-                if btn.text and btn.text not in ['🏠主菜单', '⬅️ 返回']:
+                if btn.text and btn.text not in ['🏠主菜单', '🏠 主菜单', '⬅️ 返回', '↩️返回', '🔄 返回分类']:
                     product = self._parse_product(category, btn.text, btn.data)
                     if product:
                         products.append(product)
