@@ -3,7 +3,6 @@
 """
 import asyncio
 import sys
-from scraper import ProductScraper
 from purchaser import AutoPurchaser
 from bot import SalesBot
 from database import Database
@@ -12,15 +11,17 @@ from config import Config
 # 设置控制台编码
 sys.stdout.reconfigure(encoding='utf-8')
 
-async def sync_products_loop(scraper):
-    """商品同步循环"""
+async def sync_products_loop():
+    """商品同步循环（使用多来源同步）"""
     # 先等待，再同步
     await asyncio.sleep(Config.SYNC_INTERVAL)
     
     while True:
         try:
-            print(f'\n🔄 开始定时同步商品...')
-            await scraper.scrape_all()
+            print(f'\n🔄 开始定时同步商品（多来源）...')
+            from sync_multi_source import MultiSourceScraper
+            scraper = MultiSourceScraper()
+            await scraper.sync_all_sources()
             print(f'✅ 定时同步完成，下次同步时间: {Config.SYNC_INTERVAL // 60} 分钟后\n')
         except Exception as e:
             print(f'❌ 定时同步失败: {e}')
@@ -36,7 +37,7 @@ async def main():
     # 初始化数据库
     db = Database()
     
-    # 登录代购账号（只登录一次）
+    # 登录代购账号1（只登录一次，用于主机器人功能）
     from client_manager import ClientManager
     buyer_client = await ClientManager.get_client()
     
@@ -44,9 +45,7 @@ async def main():
     purchaser = AutoPurchaser(buyer_client)
     await purchaser.start()
     
-    # 初始化商品抓取器（共享客户端）
-    scraper = ProductScraper(buyer_client)
-    await scraper.start()
+    print('✅ 代购模块已准备就绪')
     
     # 检查数据库中是否有商品
     conn = db.get_connection()
@@ -59,14 +58,16 @@ async def main():
         print(f'✅ 检测到 {product_count} 个商品，跳过首次同步')
         print(f'⏰ 将在 {Config.SYNC_INTERVAL // 60} 分钟后自动同步')
     else:
-        print('📊 首次启动，开始抓取商品...')
+        print('📊 首次启动，开始抓取商品（多来源）...')
         try:
-            await scraper.scrape_all()
+            from sync_multi_source import MultiSourceScraper
+            scraper = MultiSourceScraper()
+            await scraper.sync_all_sources()
         except Exception as e:
             print(f'⚠️ 首次同步失败: {e}')
     
     # 启动定时同步（60分钟后开始）
-    asyncio.create_task(sync_products_loop(scraper))
+    asyncio.create_task(sync_products_loop())
     
     # 启动销售机器人（异步方式）
     sales_bot = SalesBot(purchaser)
