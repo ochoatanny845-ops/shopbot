@@ -584,21 +584,26 @@ class SalesBot:
         
         keyboard.append([InlineKeyboardButton("🏠 返回主菜单", callback_data='back_main')])
         
-        await query.edit_message_text(
-            '💰 **选择充值方式**\n\n'
-            '💎 **USDT TRC20 充值**\n'
-            '   - 去中心化，资金直达\n'
-            '   - 到账时间：1-3 分钟\n'
-            '   - 需要复制交易哈希验证\n\n'
-            + ('⚡ **OKPay 快速充值**\n'
-               '   - 支付即到账，无需等待\n'
-               '   - 到账时间：秒到\n'
-               '   - 一键支付，自动确认\n\n' 
-               if hasattr(Config, 'OKPAY_SHOP_ID') and Config.OKPAY_SHOP_ID else '') +
-            f'最低充值：{Config.MIN_RECHARGE_AMOUNT} USDT',
-            reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode='Markdown'
-        )
+        try:
+            await query.edit_message_text(
+                '💰 **选择充值方式**\n\n'
+                '💎 **USDT TRC20 充值**\n'
+                '   - 去中心化，资金直达\n'
+                '   - 到账时间：1-3 分钟\n'
+                '   - 需要复制交易哈希验证\n\n'
+                + ('⚡ **OKPay 快速充值**\n'
+                   '   - 点击支付后，点"我已支付"查询\n'
+                   '   - 到账时间：即时（需手动确认）\n'
+                   '   - 一键支付，简单快捷\n\n' 
+                   if hasattr(Config, 'OKPAY_SHOP_ID') and Config.OKPAY_SHOP_ID else '') +
+                f'最低充值：{Config.MIN_RECHARGE_AMOUNT} USDT',
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode='Markdown'
+            )
+        except Exception as e:
+            # 如果消息没有变化，忽略错误
+            if "Message is not modified" not in str(e):
+                raise
     
     async def _cancel_recharge(self, query, order_id):
         """取消充值订单"""
