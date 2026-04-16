@@ -29,17 +29,17 @@ LANG = {
         # ===== 分类 Categories =====
         'select_product_type': '📱 请选择商品类型：',
         'select_category': '选择账号国家或时间段:',
-        'cat_asian': '🌐 亚洲国家',
-        'cat_european': '🌐 欧美国家',
-        'cat_african': '🌐 非洲国家',
-        'cat_feb_may': '📅 2-5月账号',
-        'cat_jun_dec': '⭐ 6-12月账号',
-        'cat_1_2_year': '💎 1-2年老号',
-        'cat_3_4_year': '👑 3-4年老号',
-        'cat_5plus_year': '🏆 5年以上老号',
-        'cat_7plus_year': '🌈 7年以上主号',
-        'cat_vip': '💠 会员号-VIP',
-        'cat_fancy': '✨ 靓号5A~9A',
+        'cat_asian': '🌏 亚洲国家',
+        'cat_european': '🌍 欧美国家',
+        'cat_african': '🌍 非洲国家',
+        'cat_feb_may': '🛡 2月-5月',
+        'cat_jun_dec': '⭐️ 6月-12月',
+        'cat_1_2_year': '💎 1年-2年老号',
+        'cat_3_4_year': '🔮 3年-4年老号',
+        'cat_5plus_year': '👑 5年以上老号',
+        'cat_7plus_year': '🌈七年以上适合当主号使用',
+        'cat_vip': '💍会员号~VIP',
+        'cat_fancy': '✨靓号5A~~9A（AAAAA连号）',
         
         # ===== 商品列表 Product List =====
         'product_info': '商品信息',
@@ -198,17 +198,17 @@ LANG = {
         # ===== Categories =====
         'select_product_type': '📱 Please select product type:',
         'select_category': 'Select account country or time period:',
-        'cat_asian': '🌐 Asian Countries',
-        'cat_european': '🌐 European and American Countries',
-        'cat_african': '🌐 African Countries',
-        'cat_feb_may': '📅 February-May',
-        'cat_jun_dec': '⭐ June-December',
-        'cat_1_2_year': '💎 1-2 Year Old Accounts',
-        'cat_3_4_year': '👑 3-4 Year Old Accounts',
-        'cat_5plus_year': '🏆 Over 5 Year Old Accounts',
-        'cat_7plus_year': '🌈 Suitable as Primary Account for Over 7 Years',
-        'cat_vip': '💠 Member Account-VIP (Blind box refundable)',
-        'cat_fancy': '✨ Fancy Number 5A~~9A (AAAAA consecutive)',
+        'cat_asian': '🌏 Asian Countries',
+        'cat_european': '🌍 European & American',
+        'cat_african': '🌍 African Countries',
+        'cat_feb_may': '🛡 February-May',
+        'cat_jun_dec': '⭐️ June-December',
+        'cat_1_2_year': '💎 1-2 Year Old',
+        'cat_3_4_year': '🔮 3-4 Year Old',
+        'cat_5plus_year': '👑 5+ Year Old',
+        'cat_7plus_year': '🌈 7+ Year (Main Account)',
+        'cat_vip': '💍 VIP Membership',
+        'cat_fancy': '✨ Premium Numbers (5A-9A)',
         
         # ===== Product List =====
         'product_info': 'Product Info',
@@ -521,19 +521,19 @@ def translate_category_name(category_name, target_lang='zh'):
     Returns:
         str: 翻译后的分类名 Translated category name
     """
-    # 分类名称映射 Category name mapping
+    # 分类名称映射 Category name mapping (匹配数据库实际分类名)
     category_map = {
-        '🌐 亚洲国家': 'cat_asian',
-        '🌐 欧美国家': 'cat_european',
-        '🌐 非洲国家': 'cat_african',
-        '📅 2-5月账号': 'cat_feb_may',
-        '⭐ 6-12月账号': 'cat_jun_dec',
-        '💎 1-2年老号': 'cat_1_2_year',
-        '👑 3-4年老号': 'cat_3_4_year',
-        '🏆 5年以上老号': 'cat_5plus_year',
-        '🌈 7年以上主号': 'cat_7plus_year',
-        '💠 会员号-VIP': 'cat_vip',
-        '✨ 靓号5A~9A': 'cat_fancy',
+        '🌏 亚洲国家': 'cat_asian',
+        '🌍 欧美国家': 'cat_european',
+        '🌍 非洲国家': 'cat_african',
+        '🛡 2月-5月': 'cat_feb_may',
+        '⭐️ 6月-12月': 'cat_jun_dec',
+        '💎 1年-2年老号': 'cat_1_2_year',
+        '🔮 3年-4年老号': 'cat_3_4_year',
+        '👑 5年以上老号': 'cat_5plus_year',
+        '🌈七年以上适合当主号使用': 'cat_7plus_year',
+        '💍会员号~VIP': 'cat_vip',
+        '✨靓号5A~~9A（AAAAA连号）': 'cat_fancy',
     }
     
     # 查找对应的键 Find corresponding key
