@@ -964,6 +964,29 @@ class SalesBot:
         """显示主菜单(原版简洁布局)"""
         balance = self._get_balance(user_id)
         customer_service_url = self.db.get_setting('customer_service_url', 'https://t.me/id2uu')
+        order_notification_url = self.db.get_setting('order_notification_url', 'https://t.me/your_channel')
+        
+        # 查询用户统计数据
+        conn = self.db.get_connection()
+        c = conn.cursor()
+        
+        # 消费金额（已完成订单的总金额）
+        c.execute('''
+            SELECT COALESCE(SUM(total_price), 0)
+            FROM orders
+            WHERE user_id = ? AND status = 'completed'
+        ''', (user_id,))
+        total_spent = c.fetchone()[0]
+        
+        # 购买数量（已完成订单的总数量）
+        c.execute('''
+            SELECT COALESCE(SUM(quantity), 0)
+            FROM orders
+            WHERE user_id = ? AND status = 'completed'
+        ''', (user_id,))
+        total_orders = c.fetchone()[0]
+        
+        conn.close()
         
         # 根据语言获取欢迎词
         if lang == 'zh':
@@ -997,8 +1020,17 @@ class SalesBot:
         # 语言切换按钮放在最底部
         keyboard.append([InlineKeyboardButton(get_text('btn_language', lang), callback_data='change_language')])
 
-        # 使用原始布局的消息格式
-        text = f"{start_message}\n\n📱 {get_text('your_id_label', lang)} `{user_id}`\n💰 {get_text('current_balance', lang)} **${balance:.2f} USDT**"
+        # 新格式：欢迎词 + 用户统计 + 链接
+        text = (
+            f"{start_message}\n\n"
+            f"{get_text('user_stats_id', lang)} {user_id}\n\n"
+            f"{get_text('user_stats_balance', lang)} ${balance:.2f}\n"
+            f"{get_text('user_stats_spent', lang)} ${total_spent:.2f}\n"
+            f"{get_text('user_stats_orders', lang)} {total_orders}\n"
+            f"-------------------------------\n"
+            f"{get_text('order_notification', lang)} {order_notification_url}\n"
+            f"{get_text('customer_service', lang)} {customer_service_url}"
+        )
 
         if hasattr(update_or_query, 'edit_message_text'):
             await update_or_query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')

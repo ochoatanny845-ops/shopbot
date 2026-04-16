@@ -165,6 +165,12 @@ LANG = {
         'cancel_recharge_btn': '❌ 取消充值',
         'my_orders_title': '📋 我的订单',
         'no_orders': '📋 暂无订单',
+        'user_stats_id': '👤 ID:',
+        'user_stats_balance': '🏦 USDT:',
+        'user_stats_spent': '💵 消费金额:',
+        'user_stats_orders': '✅ 购买数量:',
+        'order_notification': '📢 订单通知:',
+        'customer_service': '👩🏻‍💻 官方客服:',
         
         # ===== 使用说明 Usage Instructions =====
         'protocol_note': '📄 协议号: 适用于软件或脚本',
@@ -428,6 +434,12 @@ LANG = {
         'cancel_recharge_btn': '❌ Cancel Recharge',
         'my_orders_title': '📋 My Orders',
         'no_orders': '📋 No orders yet',
+        'user_stats_id': '👤 ID:',
+        'user_stats_balance': '🏦 USDT:',
+        'user_stats_spent': '💵 Total Spent:',
+        'user_stats_orders': '✅ Total Orders:',
+        'order_notification': '📢 Order Notifications:',
+        'customer_service': '👩🏻‍💻 Customer Service:',
         
         'purchase_product': '🗂 Purchase Product',
         'product_price': '💰 Product Price',
