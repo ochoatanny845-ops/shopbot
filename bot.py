@@ -570,11 +570,11 @@ class SalesBot:
 
         processing_msg = await update.message.reply_text(
             f"{get_text('processing_order', lang)}\n\n"
-            f"🛍 {get_text('product_label', lang)}: {state['product_name']}\n"
-            f"💰 {get_text('unit_price_label', lang)}: ${state['price']}\n"
-            f"📦 {get_text('quantity_label', lang)}: {quantity}\n"
-            f"💵 {get_text('total_price_label', lang)}: ${total_price:.2f}\n"
-            f"📋 {get_text('order_number_label', lang)}: {order_id}\n\n"
+            f"{get_text('product_label', lang)} {state['product_name']}\n"
+            f"{get_text('unit_price_label', lang)} ${state['price']}\n"
+            f"{get_text('quantity_label', lang)} {quantity}\n"
+            f"{get_text('total_price_label', lang)} ${total_price:.2f}\n"
+            f"{get_text('order_number_label', lang)} {order_id}\n\n"
             f"{get_text('checking_accounts', lang)}"
         )
 
