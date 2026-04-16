@@ -44,6 +44,7 @@ LANG = {
         # ===== 商品列表 Product List =====
         'product_info': '商品信息',
         'stock_label': '📦 库存',
+        'products_available': '件商品',
         'available_quantity': '可用数量',
         'include': '包含:',
         'unit_price': '单价',
@@ -173,6 +174,7 @@ LANG = {
         # ===== Product List =====
         'product_info': 'Product Info',
         'stock_label': '📦 Stock',
+        'products_available': 'products available',
         'available_quantity': 'Available Quantity',
         'include': 'include:',
         'unit_price': 'Unit Price',
