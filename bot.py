@@ -9,6 +9,20 @@ from database import Database
 from recharge_handler import RechargeHandler
 from admin_handler import AdminHandler
 from language import get_text, translate_product_name, translate_category_name
+from datetime import datetime, timezone, timedelta
+
+# UTC+8 时区（北京/香港时间）
+UTC8 = timezone(timedelta(hours=8))
+
+def get_utc8_now():
+    """获取当前UTC+8时间"""
+    return datetime.now(UTC8)
+
+def utc_to_utc8(dt):
+    """转换UTC时间为UTC+8"""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(UTC8)
 
 class SalesBot:
     """销售机器人"""
@@ -745,7 +759,6 @@ class SalesBot:
     async def _show_orders(self, query):
         user_id = query.from_user.id
         lang = self.get_user_language(user_id) or 'zh'
-        user_id = query.from_user.id
 
         conn = self.db.get_connection()
         c = conn.cursor()
@@ -763,14 +776,14 @@ class SalesBot:
 
         if not orders:
             await query.edit_message_text(
-                "📋 暂无订单",
+                get_text('no_orders', lang),
                 reply_markup=InlineKeyboardMarkup([[
                     InlineKeyboardButton(get_text('btn_back', lang), callback_data="back_main")
                 ]])
             )
             return
 
-        text = "📋 我的订单\n\n"
+        text = f"{get_text('my_orders_title', lang)}\n\n"
         for oid, name, price, status, created in orders:
             status_emoji = {
                 'completed': '✅',
@@ -778,9 +791,28 @@ class SalesBot:
                 'failed': '❌',
                 'pending': '⏸'
             }.get(status, '❓')
+            
+            # 翻译商品名
+            translated_name = translate_product_name(name, lang)
+            
+            # 转换时间为UTC+8（北京时间）
+            try:
+                # 假设数据库中的时间是UTC或本地时间
+                if 'T' in created:
+                    dt = datetime.fromisoformat(created.replace('Z', '+00:00'))
+                else:
+                    dt = datetime.strptime(created, '%Y-%m-%d %H:%M:%S')
+                    dt = dt.replace(tzinfo=timezone.utc)
+                
+                # 转换为UTC+8
+                dt_utc8 = utc_to_utc8(dt)
+                time_str = dt_utc8.strftime('%Y-%m-%d %H:%M')
+            except:
+                # 如果转换失败，使用原始时间前16个字符
+                time_str = created[:16]
 
-            text += f"{status_emoji} #{oid} - {name}\n"
-            text += f"   ${price} | {created[:16]}\n\n"
+            text += f"{status_emoji} #{oid} - {translated_name}\n"
+            text += f"   ${price} | {time_str}\n\n"
 
         await query.edit_message_text(
             text,

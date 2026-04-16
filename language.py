@@ -163,6 +163,8 @@ LANG = {
         'tip_submit_before': '⏰ 请在',
         'tip_submit_suffix': '前提交',
         'cancel_recharge_btn': '❌ 取消充值',
+        'my_orders_title': '📋 我的订单',
+        'no_orders': '📋 暂无订单',
         
         # ===== 使用说明 Usage Instructions =====
         'protocol_note': '📄 协议号: 适用于软件或脚本',
@@ -424,6 +426,8 @@ LANG = {
         'tip_submit_before': '⏰ Please submit before',
         'tip_submit_suffix': '',
         'cancel_recharge_btn': '❌ Cancel Recharge',
+        'my_orders_title': '📋 My Orders',
+        'no_orders': '📋 No orders yet',
         
         'purchase_product': '🗂 Purchase Product',
         'product_price': '💰 Product Price',
