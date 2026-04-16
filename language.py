@@ -84,9 +84,40 @@ LANG = {
         'minimum_recharge': '💵 最低充值',
         'recharge_address': '充值地址',
         'recharge_amount': '充值金额',
-        'waiting_payment': '等待到账',
+        'waiting_payment': '⏳ 等待到账',
         'recharge_success': '✅ 充值成功',
         'recharge_failed': '❌ 充值失败',
+        
+        # TRC20 充值详情
+        'trc20_recharge_title': '💳 **USDT TRC20 充值**',
+        'recharge_address_label': '📋 充值地址',
+        'recharge_amount_label': '💵 充值金额',
+        'notes_label': '⚠️ 注意事项',
+        'trc20_note_1': '1️⃣ 请使用 **USDT-TRC20** 转账',
+        'trc20_note_2': '2️⃣ 转账金额务必精确到 **{amount} USDT**',
+        'trc20_note_3': '3️⃣ 转账后系统将自动检测并到账',
+        'arrival_time': '🔄 到账时间',
+        'arrival_time_desc': '通常 1-5 分钟',
+        'monitoring_transfer': '🔍 正在监控转账,请稍候...',
+        
+        # OKPay 充值详情
+        'okpay_recharge_title': '⚡ **OKPay 快速充值**',
+        'actual_payment': '💰 实际支付',
+        'exchange_rate': '汇率',
+        'operation_steps': '📋 操作步骤',
+        'okpay_step_1': '1️⃣ 点击下方 "前往 OKPay 支付" 按钮',
+        'okpay_step_2': '2️⃣ 在打开的页面完成支付',
+        'okpay_step_3': '3️⃣ **支付成功后点击"检查 支付状态"**',
+        'okpay_reminder': '⚠️ 请在支付完成后点击"检查 支付状态"按钮',
+        'goto_okpay': '💳 前往 OKPay 支付',
+        'check_payment': '✅ 检查 支付状态',
+        'cancel_recharge': '❌ 取消 充值',
+        
+        # 充值状态
+        'recharge_success_title': '✅ 充值成功!',
+        'recharged_amount': '💰 充值金额',
+        'thank_you': '🎉 感谢使用!祝您购物愉快 🛍️',
+        'invalid_verification_code': '❌ 验证码格式错误,请输入6位"数字"码',
         
         # ===== 余额 Balance =====
         'balance_title': '💳 余额',
@@ -216,9 +247,40 @@ LANG = {
         'minimum_recharge': '💵 Minimum recharge',
         'recharge_address': 'Recharge Address',
         'recharge_amount': 'Recharge Amount',
-        'waiting_payment': 'Waiting for payment',
+        'waiting_payment': '⏳ Waiting for payment',
         'recharge_success': '✅ Recharge successful',
         'recharge_failed': '❌ Recharge failed',
+        
+        # TRC20 Recharge Details
+        'trc20_recharge_title': '💳 **USDT TRC20 Recharge**',
+        'recharge_address_label': '📋 Recharge Address',
+        'recharge_amount_label': '💵 Recharge Amount',
+        'notes_label': '⚠️ Important Notes',
+        'trc20_note_1': '1️⃣ Please use **USDT-TRC20** transfer',
+        'trc20_note_2': '2️⃣ Transfer amount must be exactly **{amount} USDT**',
+        'trc20_note_3': '3️⃣ System will auto-detect and credit after transfer',
+        'arrival_time': '🔄 Arrival Time',
+        'arrival_time_desc': 'Usually 1-5 minutes',
+        'monitoring_transfer': '🔍 Monitoring transfer, please wait...',
+        
+        # OKPay Recharge Details
+        'okpay_recharge_title': '⚡ **OKPay Fast Recharge**',
+        'actual_payment': '💰 Actual Payment',
+        'exchange_rate': 'Exchange Rate',
+        'operation_steps': '📋 Operation Steps',
+        'okpay_step_1': '1️⃣ Click "Go to OKPay" button below',
+        'okpay_step_2': '2️⃣ Complete payment on the opened page',
+        'okpay_step_3': '3️⃣ **Click "Check Payment Status" after payment**',
+        'okpay_reminder': '⚠️ Please click "Check Payment Status" button after completing payment',
+        'goto_okpay': '💳 Go to OKPay',
+        'check_payment': '✅ Check Payment Status',
+        'cancel_recharge': '❌ Cancel Recharge',
+        
+        # Recharge Status
+        'recharge_success_title': '✅ Recharge Successful!',
+        'recharged_amount': '💰 Recharged Amount',
+        'thank_you': '🎉 Thank you! Happy shopping 🛍️',
+        'invalid_verification_code': '❌ Invalid verification code, please enter 6-digit code',
         
         # ===== Balance =====
         'balance_title': '💳 Balance',
