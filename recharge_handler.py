@@ -196,6 +196,7 @@ class RechargeHandler:
     async def _handle_okpay_recharge(self, update: Update, context: ContextTypes.DEFAULT_TYPE, amount: float):
         """处理 OKPay 充值"""
         user_id = update.effective_user.id
+        lang = self._get_user_language(user_id)
         
         # 生成唯一订单号
         unique_id = f"SHOP_{user_id}_{int(datetime.now().timestamp())}_{uuid.uuid4().hex[:8]}"
@@ -601,6 +602,7 @@ class RechargeHandler:
         # 提取订单号
         order_id = int(query.data.split('_')[2])
         user_id = query.from_user.id
+        lang = self._get_user_language(user_id)
         
         print(f'\n📋 用户查询 OKPay 订单')
         print(f'  订单号: {order_id}')
