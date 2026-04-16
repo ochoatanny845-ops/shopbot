@@ -8,7 +8,10 @@ LANG = {
     'zh': {
         # ===== 主菜单 Main Menu =====
         'main_menu_title': '🤖 欢迎使用 Telegram 账号代购系统',
+        'welcome_message': '👋 欢迎使用电报账号商城!\n\n📱 请选择服务:',
+        'user_id_label': '用户ID',
         'btn_products': '📱 Telegram账号购买',
+        'product_types': '直登+协议+api',
         'btn_recharge': '💰 充值',
         'btn_balance': '💳 余额',
         'btn_orders': '📦 我的订单',
@@ -181,7 +184,10 @@ LANG = {
     'en': {
         # ===== Main Menu =====
         'main_menu_title': '🤖 Welcome to Telegram Account Store',
+        'welcome_message': '👋 Welcome to Telegram Account Store!\n\n📱 Please select service:',
+        'user_id_label': 'User ID',
         'btn_products': '📱 Telegram Accounts',
+        'product_types': 'Direct Login + Protocol + API',
         'btn_recharge': '💰 Recharge',
         'btn_balance': '💳 Balance',
         'btn_orders': '📦 My Orders',
