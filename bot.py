@@ -510,13 +510,13 @@ class SalesBot:
             quantity = int(text)
             if quantity <= 0 or quantity > state['stock']:
                 await update.message.reply_text(
-                    f"❌ 数量无效\n\n"
-                    f"请输入 1-{state['stock']} 之间的数字"
+                    f"{get_text('invalid_quantity', lang)}\n\n"
+                    f"{get_text('enter_between', lang)} 1-{state['stock']}"
                 )
                 return
         except ValueError:
             await update.message.reply_text(
-                "❌ 请输入有效的数字"
+                get_text('invalid_number', lang)
             )
             return
         

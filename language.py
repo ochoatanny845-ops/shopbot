@@ -111,6 +111,8 @@ LANG = {
         'view_details': '📄 查看详情',
         
         # ===== 错误提示 Error Messages =====
+        'enter_between': '请输入',
+        'invalid_number': '❌ 请输入有效的数字',
         'insufficient_balance': '❌ 余额不足，请先充值',
         'out_of_stock_error': '❌ 库存不足，无法购买',
         'purchase_failed': '❌ 购买失败',
@@ -241,6 +243,8 @@ LANG = {
         'view_details': '📄 View Details',
         
         # ===== Error Messages =====
+        'enter_between': 'Please enter',
+        'invalid_number': '❌ Please enter a valid number',
         'insufficient_balance': '❌ Insufficient balance, please recharge first',
         'out_of_stock_error': '❌ Out of stock, cannot purchase',
         'purchase_failed': '❌ Purchase failed',
