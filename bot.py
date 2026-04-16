@@ -570,12 +570,12 @@ class SalesBot:
 
         processing_msg = await update.message.reply_text(
             f"{get_text('processing_order', lang)}\n\n"
-            f"🛍 商品:{state['product_name']}\n"
-            f"💰 单价:${state['price']}\n"
-            f"📦 数量:{quantity}\n"
-            f"💵 总价:${total_price:.2f}\n"
-            f"📋 订单号:{order_id}\n\n"
-            f"♻️正在打包检查账号存活,请耐心稍候..."
+            f"🛍 {get_text('product_label', lang)}: {state['product_name']}\n"
+            f"💰 {get_text('unit_price_label', lang)}: ${state['price']}\n"
+            f"📦 {get_text('quantity_label', lang)}: {quantity}\n"
+            f"💵 {get_text('total_price_label', lang)}: ${total_price:.2f}\n"
+            f"📋 {get_text('order_number_label', lang)}: {order_id}\n\n"
+            f"{get_text('checking_accounts', lang)}"
         )
 
         # 调用代购模块(传递 user_id 和 order_id 用于隔离)
