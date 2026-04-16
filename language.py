@@ -501,11 +501,11 @@ def translate_country_name(name, target_lang='zh'):
 
 def translate_product_name(product_name, target_lang='zh'):
     """
-    翻译商品名称中的国家名
-    Translate country name in product name
+    翻译商品名称中的国家名和描述
+    Translate country name and description in product name
     
     Args:
-        product_name: 商品名称 Product name (e.g., "🇲🇲+95缅甸 [26118] - $0.33")
+        product_name: 商品名称 Product name (e.g., "🇲🇲+95缅甸-5年以上老号 [26118] - $0.33")
         target_lang: 目标语言 ('zh' or 'en')
     
     Returns:
@@ -514,12 +514,30 @@ def translate_product_name(product_name, target_lang='zh'):
     if target_lang == 'zh':
         return product_name  # 中文保持原样 Keep Chinese as is
     
-    # 英文：替换国家名 English: Replace country name
+    # 英文：替换国家名
     result = product_name
     for zh_name, en_name in COUNTRY_NAMES['zh_to_en'].items():
         if zh_name in result:
             result = result.replace(zh_name, en_name)
-            break  # 只替换第一个匹配 Replace only first match
+            break  # 只替换第一个匹配
+    
+    # 英文：替换商品描述
+    description_map = {
+        '5年以上老号': '5+ Year Old',
+        '3年-4年老号': '3-4 Year Old',
+        '1年-2年老号': '1-2 Year Old',
+        '6月-12月': '6-12 Month',
+        '2月-5月': '2-5 Month',
+        '7年以上适合当主号使用': '7+ Year (Main Account)',
+        '会员号~VIP': 'VIP Membership',
+        '靓号5A~~9A': 'Premium 5A-9A',
+        '老号': 'Old Account',
+        '账号': 'Account',
+    }
+    
+    for zh_desc, en_desc in description_map.items():
+        if zh_desc in result:
+            result = result.replace(zh_desc, en_desc)
     
     return result
 
