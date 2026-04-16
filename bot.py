@@ -764,7 +764,7 @@ class SalesBot:
         c = conn.cursor()
 
         c.execute('''
-            SELECT id, product_name, total_price, status, created_at
+            SELECT id, product_name, quantity, unit_price, total_price, status, created_at
             FROM orders
             WHERE user_id = ?
             ORDER BY created_at DESC
@@ -784,7 +784,7 @@ class SalesBot:
             return
 
         text = f"{get_text('my_orders_title', lang)}\n\n"
-        for oid, name, price, status, created in orders:
+        for oid, name, qty, unit_price, total_price, status, created in orders:
             status_emoji = {
                 'completed': '✅',
                 'processing': '⏳',
@@ -812,7 +812,7 @@ class SalesBot:
                 time_str = created[:16]
 
             text += f"{status_emoji} #{oid} - {translated_name}\n"
-            text += f"   ${price} | {time_str}\n\n"
+            text += f"   {qty}x ${unit_price} = ${total_price} | {time_str}\n\n"
 
         await query.edit_message_text(
             text,
