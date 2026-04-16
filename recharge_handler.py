@@ -70,17 +70,26 @@ class RechargeHandler:
         
         reply_markup = InlineKeyboardMarkup(keyboard)
         
+        text = (
+            f"{get_text('select_recharge_method_title', lang)}\n\n"
+            f"{get_text('trc20_method_title', lang)}\n"
+            f"   - {get_text('trc20_method_desc_1', lang)}\n"
+            f"   - {get_text('trc20_method_desc_2', lang)}\n"
+            f"   - {get_text('trc20_method_desc_3', lang)}\n\n"
+        )
+        
+        if self.okpay:
+            text += (
+                f"{get_text('okpay_method_title', lang)}\n"
+                f"   - {get_text('okpay_method_desc_1', lang)}\n"
+                f"   - {get_text('okpay_method_desc_2', lang)}\n"
+                f"   - {get_text('okpay_method_desc_3', lang)}\n\n"
+            )
+        
+        text += get_text('minimum_recharge_notice', lang)
+        
         await update.message.reply_text(
-            '💰 **选择充值方式**\n\n'
-            '💎 **USDT TRC20 充值**\n'
-            '   - 去中心化，资金直达\n'
-            '   - 到账时间：1-3 分钟\n'
-            '   - 需要复制交易哈希验证\n\n'
-            + ('⚡ **OKPay 快速充值**\n'
-               '   - 支付即到账，无需等待\n'
-               '   - 到账时间：秒到\n'
-               '   - 一键支付，自动确认\n\n' if self.okpay else '') +
-            '最低充值：1 USDT',
+            text,
             reply_markup=reply_markup,
             parse_mode='Markdown'
         )
@@ -89,6 +98,8 @@ class RechargeHandler:
         """处理充值方式选择"""
         query = update.callback_query
         await query.answer()
+        user_id = query.from_user.id
+        lang = self._get_user_language(user_id)
         
         context.user_data['recharge_method'] = method
         context.user_data['waiting_for'] = 'recharge_amount'
@@ -96,15 +107,15 @@ class RechargeHandler:
         # 发送提示并保存消息 ID
         if method == 'trc20':
             prompt_text = (
-                '💎 **USDT TRC20 充值**\n\n'
-                '⚠️ 最低充值：1 USDT\n'
-                '⚠️ 请输入数字，例如：10'
+                f"{get_text('trc20_recharge_instructions_title', lang)}\n\n"
+                f"{get_text('minimum_recharge_warning', lang)}\n"
+                f"{get_text('enter_amount_example', lang)}"
             )
         else:  # okpay
             prompt_text = (
-                '⚡ **OKPay 快速充值**\n\n'
-                '⚠️ 最低充值：1 USDT\n'
-                '⚠️ 请输入数字，例如：10'
+                f"{get_text('okpay_recharge_title', lang)}\n\n"
+                f"{get_text('okpay_minimum_notice', lang)}\n"
+                f"{get_text('okpay_enter_amount_example', lang)}"
             )
         
         amount_prompt = await query.edit_message_text(
