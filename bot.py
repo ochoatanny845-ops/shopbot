@@ -381,7 +381,7 @@ class SalesBot:
                 f"⚠️ 分类 {category} 暂无商品",
                 reply_markup=InlineKeyboardMarkup([[
                     InlineKeyboardButton("⬅️ 返回分类", callback_data="show_categories"),
-                    InlineKeyboardButton("🏠 主菜单", callback_data="back_main")
+                    InlineKeyboardButton(get_text('btn_main_menu', lang), callback_data="back_main")
                 ]])
             )
             return
@@ -395,7 +395,7 @@ class SalesBot:
         
         keyboard.append([
             InlineKeyboardButton("⬅️ 返回分类", callback_data="show_categories"),
-            InlineKeyboardButton("🏠 主菜单", callback_data="back_main")
+            InlineKeyboardButton(get_text('btn_main_menu', lang), callback_data="back_main")
         ])
         
         await query.edit_message_text(
@@ -566,7 +566,7 @@ class SalesBot:
         del self.user_states[user_id]
         
         processing_msg = await update.message.reply_text(
-            f"⏳ 订单处理中...\n\n"
+            f"{get_text('processing_order', lang)}\n\n"
             f"🛍 商品：{state['product_name']}\n"
             f"💰 单价：${state['price']}\n"
             f"📦 数量：{quantity}\n"

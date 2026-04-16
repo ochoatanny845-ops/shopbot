@@ -27,6 +27,7 @@ LANG = {
         'current_language': '当前语言',
         
         # ===== 分类 Categories =====
+        'select_product_type': '📱 请选择商品类型：',
         'select_category': '选择账号国家或时间段:',
         'cat_asian': '🌐 亚洲国家',
         'cat_european': '🌐 欧美国家',
@@ -41,6 +42,8 @@ LANG = {
         'cat_fancy': '✨ 靓号5A~9A',
         
         # ===== 商品列表 Product List =====
+        'product_info': '商品信息',
+        'stock_label': '📦 库存',
         'available_quantity': '可用数量',
         'include': '包含:',
         'unit_price': '单价',
@@ -48,6 +51,9 @@ LANG = {
         'out_of_stock': '暂无库存',
         
         # ===== 购买流程 Purchase Process =====
+        'btn_back_category': '🔙 返回分类',
+        'btn_main_menu': '🏠 主菜单',
+        'total_price_label': '💵 总价',
         'enter_quantity': '请输入购买数量:',
         'processing_order': '⏳ 订单处理中...',
         'checking_accounts': '♻️正在打包检查账号存活，请耐心稍候...',
@@ -150,6 +156,7 @@ LANG = {
         'current_language': 'Current Language',
         
         # ===== Categories =====
+        'select_product_type': '📱 Please select product type:',
         'select_category': 'Select account country or time period:',
         'cat_asian': '🌐 Asian Countries',
         'cat_european': '🌐 European and American Countries',
@@ -164,6 +171,8 @@ LANG = {
         'cat_fancy': '✨ Fancy Number 5A~~9A (AAAAA consecutive)',
         
         # ===== Product List =====
+        'product_info': 'Product Info',
+        'stock_label': '📦 Stock',
         'available_quantity': 'Available Quantity',
         'include': 'include:',
         'unit_price': 'Unit Price',
@@ -171,6 +180,9 @@ LANG = {
         'out_of_stock': 'Out of Stock',
         
         # ===== Purchase Process =====
+        'btn_back_category': '🔙 Back to Categories',
+        'btn_main_menu': '🏠 Main Menu',
+        'total_price_label': '💵 Total',
         'enter_quantity': 'Please enter purchase quantity:',
         'processing_order': '⏳ Processing Order...',
         'checking_accounts': '♻️ Checking account status, please wait...',
