@@ -647,16 +647,23 @@ def translate_product_name(product_name, target_lang='zh'):
     
     # 英文：替换商品描述
     description_map = {
+        # 年份描述（按优先级排序，长的在前）
+        '7年以上适合当主号使用': '7+ Year (Main Account)',
         '5年以上老号': '5+ Year Old',
+        '5年以上': '5+ Year Old',
         '3年-4年老号': '3-4 Year Old',
+        '3-4年以上': '3-4 Year Old',
+        '3-4年老号': '3-4 Year Old',
         '1年-2年老号': '1-2 Year Old',
+        '1-2年老号': '1-2 Year Old',
         '6月-12月': '6-12 Month',
         '2月-5月': '2-5 Month',
-        '7年以上适合当主号使用': '7+ Year (Main Account)',
         '会员号~VIP': 'VIP Membership',
         '靓号5A~~9A': 'Premium 5A-9A',
         '老号': 'Old Account',
         '账号': 'Account',
+        '共和国': 'Republic',
+        '以上': '+',
     }
     
     for zh_desc, en_desc in description_map.items():
