@@ -654,8 +654,17 @@ def translate_product_name(product_name, target_lang='zh'):
         '2月-5月': '2-5 Month',
         '会员号~VIP': 'VIP Membership',
         '靓号5A~~9A': 'Premium 5A-9A',
-        '5年以上': '5+ Year',
+        # 单独年份（1-10年）
+        '10年以上': '10+ Year',
+        '9年以上': '9+ Year',
+        '8年以上': '8+ Year',
+        '7年以上': '7+ Year',
         '6年以上': '6+ Year',
+        '5年以上': '5+ Year',
+        '4年以上': '4+ Year',
+        '3年以上': '3+ Year',
+        '2年以上': '2+ Year',
+        '1年以上': '1+ Year',
         '老号': 'Old Account',
         '账号': 'Account',
     }
