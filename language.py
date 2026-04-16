@@ -651,6 +651,7 @@ COUNTRY_NAMES = {
         '牙买加': 'Jamaica',
         '海地': 'Haiti',
         '多米尼加': 'Dominican Republic',
+        '多米尼加共和国': 'Dominican Republic',
         '圣基茨和尼维斯': 'Saint Kitts and Nevis',
         '安提瓜和巴布达': 'Antigua and Barbuda',
         '多米尼克': 'Dominica',
