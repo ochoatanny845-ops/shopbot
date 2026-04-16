@@ -911,7 +911,12 @@ class SalesBot:
         """显示主菜单(原版简洁布局)"""
         balance = self._get_balance(user_id)
         customer_service_url = self.db.get_setting('customer_service_url', 'https://t.me/id2uu')
-        start_message = self.db.get_setting('start_message', '👋 欢迎使用账号购买系统!\n\n🛍 请选择服务:' if lang == 'zh' else '👋 Welcome to Account Store!\n\n🛍 Please select service:')
+        
+        # 根据语言获取欢迎词
+        if lang == 'zh':
+            start_message = self.db.get_setting('start_message', get_text('welcome_message', 'zh'))
+        else:
+            start_message = self.db.get_setting('start_message_en', get_text('welcome_message', 'en'))
 
         # 原版布局:4个按钮 + 自定义按钮(语言切换移到最底部)
         keyboard = [
