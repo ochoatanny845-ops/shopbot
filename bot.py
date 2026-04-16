@@ -304,7 +304,7 @@ class SalesBot:
 
         keyboard = [
             [InlineKeyboardButton(
-                f"TG💎直登+协议+api {get_text('available_quantity', lang)} ({total_stock})" if lang == 'en' else f"TG💎直登+协议+api 百万库存 ({total_stock}个)",
+                f"TG💎{get_text('product_types', lang)} {get_text('available_quantity', lang)} ({total_stock})",
                 callback_data="show_categories"
             )],
             [InlineKeyboardButton(get_text('btn_back', lang), callback_data="back_main")]

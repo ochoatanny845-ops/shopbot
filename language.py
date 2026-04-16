@@ -643,6 +643,7 @@ def translate_product_name(product_name, target_lang='zh'):
     # 英文：先替换商品描述（按长度从长到短排序，避免部分匹配）
     description_map = {
         # 特殊长描述
+        '数字1的随机5A靓号': 'Random 5A Premium (starts with 1)',
         '会员VIP（盲盒低于两天可退换）': 'VIP (Blind Box, Refundable <2 days)',
         '2-5月联系人受限少量测': '2-5 Month (Limited Contacts)',
         '11年以上老号（2014年）': '11+ Year Old (2014)',
@@ -712,6 +713,8 @@ def translate_product_name(product_name, target_lang='zh'):
         '1以年上': '1+ Year',
         
         # 通用词
+        '混合国家': 'Mixed Countries',
+        '共和国': 'Republic',
         '老号': 'Old',
         '月号': 'Monthly',
         '账号': 'Account',
