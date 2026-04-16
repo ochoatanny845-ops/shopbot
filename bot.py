@@ -12,7 +12,7 @@ from language import get_text, translate_product_name, translate_category_name
 
 class SalesBot:
     """销售机器人"""
-    
+
     def __init__(self, purchaser):
         self.db = Database()
         self.purchaser = purchaser
@@ -20,7 +20,7 @@ class SalesBot:
         self.user_states = {}  # 用户状态管理
         self.recharge_handler = RechargeHandler()  # 充值处理器
         self.admin_handler = AdminHandler()  # 管理员处理器
-    
+
     def get_user_language(self, user_id):
         """获取用户语言"""
         conn = self.db.get_connection()
@@ -29,7 +29,7 @@ class SalesBot:
         result = c.fetchone()
         conn.close()
         return result[0] if result else None
-    
+
     def set_user_language(self, user_id, language):
         """设置用户语言"""
         conn = self.db.get_connection()
@@ -37,11 +37,11 @@ class SalesBot:
         c.execute('UPDATE users SET language = ? WHERE user_id = ?', (language, user_id))
         conn.commit()
         conn.close()
-    
+
     def build_app(self):
-        """构建应用（不启动）"""
+        """构建应用(不启动)"""
         self.app = Application.builder().token(Config.BOT_TOKEN).build()
-        
+
         # 注册处理器
         self.app.add_handler(CommandHandler("start", self.cmd_start))
         self.app.add_handler(CommandHandler("add", self.cmd_add_balance))
@@ -50,176 +50,176 @@ class SalesBot:
         self.app.add_handler(CommandHandler("cha", self.admin_handler.cmd_cha))  # 查询用户
         self.app.add_handler(CallbackQueryHandler(self.handle_callback))
         self.app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message))
-        
+
         print(f'✅ 销售机器人已构建: @{Config.BOT_USERNAME}')
         return self.app
-    
+
     async def start(self):
-        """启动机器人（异步方式）"""
+        """启动机器人(异步方式)"""
         if self.app is None:
             self.build_app()
-        
+
         await self.app.initialize()
         await self.app.start()
         await self.app.updater.start_polling()
         print(f'✅ 销售机器人已启动: @{Config.BOT_USERNAME}')
-    
+
     async def stop(self):
         """停止机器人"""
         if self.app:
             await self.app.updater.stop()
             await self.app.stop()
             await self.app.shutdown()
-    
+
     async def cmd_add_balance(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """管理员余额调整命令"""
         user_id = update.effective_user.id
-        
+
         # 检查权限
         if user_id not in Config.ADMIN_IDS:
             await update.message.reply_text("❌ 无权限")
             return
-        
+
         # 解析参数
         if len(context.args) < 2:
             await update.message.reply_text(
-                "📖 使用方法：\n"
+                "📖 使用方法:\n"
                 "/add <用户ID> <金额>\n\n"
-                "例如：\n"
+                "例如:\n"
                 "/add 5991190607 10     # 充值 $10\n"
                 "/add 5991190607 -5    # 扣款 $5"
             )
             return
-        
+
         try:
             target_user_id = int(context.args[0])
             amount = float(context.args[1])
         except ValueError:
             await update.message.reply_text("❌ 参数格式错误")
             return
-        
+
         # 调整余额
         conn = self.db.get_connection()
         c = conn.cursor()
-        
+
         # 确保用户存在
         c.execute('SELECT balance FROM users WHERE user_id = ?', (target_user_id,))
         user = c.fetchone()
-        
+
         if not user:
             await update.message.reply_text(f"❌ 用户 {target_user_id} 不存在")
             conn.close()
             return
-        
+
         old_balance = user[0]
         new_balance = old_balance + amount
-        
+
         # 检查余额不能为负
         if new_balance < 0:
             await update.message.reply_text(
                 f"❌ 余额不足\n\n"
-                f"当前余额：${old_balance:.2f}\n"
-                f"扣款金额：${abs(amount):.2f}\n"
-                f"差额：${abs(new_balance):.2f}"
+                f"当前余额:${old_balance:.2f}\n"
+                f"扣款金额:${abs(amount):.2f}\n"
+                f"差额:${abs(new_balance):.2f}"
             )
             conn.close()
             return
-        
+
         # 更新余额
         c.execute('UPDATE users SET balance = ? WHERE user_id = ?', (new_balance, target_user_id))
-        
+
         # 记录日志
         log_type = 'recharge' if amount > 0 else 'deduct'
         note = f"管理员{'充值' if amount > 0 else '扣款'}"
-        
+
         c.execute('''
             INSERT INTO balance_logs (user_id, amount, type, note)
             VALUES (?, ?, ?, ?)
         ''', (target_user_id, amount, log_type, note))
-        
+
         conn.commit()
         conn.close()
-        
+
         # 发送确认消息给管理员
         emoji = "✅" if amount > 0 else "⚠️"
         action = "充值" if amount > 0 else "扣款"
-        
+
         await update.message.reply_text(
             f"{emoji} {action}成功\n\n"
-            f"用户ID：`{target_user_id}`\n"
-            f"金额：${amount:+.2f}\n"
-            f"原余额：${old_balance:.2f}\n"
-            f"新余额：${new_balance:.2f}",
+            f"用户ID:`{target_user_id}`\n"
+            f"金额:${amount:+.2f}\n"
+            f"原余额:${old_balance:.2f}\n"
+            f"新余额:${new_balance:.2f}",
             parse_mode='Markdown'
         )
-        
+
         # 发送通知给用户
         try:
             if amount > 0:
                 # 充值通知
                 user_message = (
                     f"💰 充值成功\n\n"
-                    f"充值金额：**${amount:.2f}**\n"
-                    f"当前余额：**${new_balance:.2f}**\n\n"
-                    f"感谢您的充值！现在可以购买账号了 🎉"
+                    f"充值金额:**${amount:.2f}**\n"
+                    f"当前余额:**${new_balance:.2f}**\n\n"
+                    f"感谢您的充值!现在可以购买账号了 🎉"
                 )
             else:
                 # 扣款通知
                 user_message = (
                     f"⚠️ 余额变动通知\n\n"
-                    f"扣款金额：**${abs(amount):.2f}**\n"
-                    f"当前余额：**${new_balance:.2f}**\n\n"
-                    f"如有疑问，请联系管理员"
+                    f"扣款金额:**${abs(amount):.2f}**\n"
+                    f"当前余额:**${new_balance:.2f}**\n\n"
+                    f"如有疑问,请联系管理员"
                 )
-            
+
             await context.bot.send_message(
                 chat_id=target_user_id,
                 text=user_message,
                 parse_mode='Markdown'
             )
-            
+
             print(f"✅ 已发送通知给用户 {target_user_id}")
-            
+
         except Exception as e:
             print(f"⚠️ 发送用户通知失败: {e}")
-            # 不影响充值流程，只记录错误
-    
+            # 不影响充值流程,只记录错误
+
     async def cmd_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """处理 /start 命令"""
         user = update.effective_user
-        
+
         # 保存用户
         self._save_user(user)
-        
+
         # 检查用户语言
         user_lang = self.get_user_language(user.id)
-        
+
         if user_lang is None:
-            # 首次使用，显示语言选择
+            # 首次使用,显示语言选择
             await self.show_language_selection(update)
             return
-        
-        # 已选择语言，显示主菜单
+
+        # 已选择语言,显示主菜单
         await self.show_main_menu(update, user.id, user_lang)
     async def cmd_recharge(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """处理 /recharge 充值命令"""
         await self.recharge_handler.handle_recharge_start(update, context)
-    
+
     async def handle_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """处理回调查询"""
         query = update.callback_query
         await query.answer()
-        
+
         data = query.data
         user_id = query.from_user.id
-        
+
         # 语言选择回调
         if data.startswith('lang_'):
             lang = data.split('_')[1]
             self.set_user_language(user_id, lang)
             await self.show_main_menu(query, user_id, lang)
             return
-        
+
         # 切换语言回调
         if data == 'change_language':
             user_lang = self.get_user_language(user_id) or 'zh'
@@ -233,27 +233,27 @@ class SalesBot:
                 reply_markup=InlineKeyboardMarkup(keyboard)
             )
             return
-        
+
         # 管理员回调
         if data.startswith('admin_'):
             await self.admin_handler.handle_admin_callback(update, context)
             return
-        
+
         # 群发回调
         if data.startswith('broadcast_'):
             await self.admin_handler.handle_broadcast_callback(update, context)
             return
-        
+
         # 自定义按钮类型选择回调
         if data.startswith('btn_type_'):
             await self.admin_handler.handle_admin_callback(update, context)
             return
-        
+
         # 自定义按钮回调
         if data.startswith('custom_btn_'):
             await self._handle_custom_button(query)
             return
-        
+
         if data == "show_product_overview":
             await self._show_product_overview(query)
         elif data == "show_categories":
@@ -284,24 +284,24 @@ class SalesBot:
             await self._show_help(query)
         elif data == "main_menu" or data == "back_main":
             await self._back_to_main(query)
-    
+
     async def _show_product_overview(self, query):
         user_id = query.from_user.id
         lang = self.get_user_language(user_id) or 'zh'
         # 统计总库存
         conn = self.db.get_connection()
         c = conn.cursor()
-        
+
         c.execute('''
             SELECT SUM(stock) as total_stock
             FROM products
             WHERE is_active = 1 AND stock > 0
         ''')
-        
+
         result = c.fetchone()
         total_stock = result[0] if result and result[0] else 0
         conn.close()
-        
+
         keyboard = [
             [InlineKeyboardButton(
                 f"TG💎直登+协议+api {get_text('available_quantity', lang)} ({total_stock})" if lang == 'en' else f"TG💎直登+协议+api 百万库存 ({total_stock}个)",
@@ -309,20 +309,20 @@ class SalesBot:
             )],
             [InlineKeyboardButton(get_text('btn_back', lang), callback_data="back_main")]
         ]
-        
+
         await query.edit_message_text(
-            "📱 **Telegram账号商品**\n\n"
-            "请选择商品类型：",
+            f"📱 **{get_text('btn_products', lang)}**\n\n"
+            f"{get_text('select_product_type', lang)}",
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode='Markdown'
         )
-    
+
     async def _show_categories(self, query):
         user_id = query.from_user.id
         lang = self.get_user_language(user_id) or 'zh'
         conn = self.db.get_connection()
         c = conn.cursor()
-        
+
         c.execute('''
             SELECT category, SUM(stock) as total_stock
             FROM products
@@ -331,19 +331,19 @@ class SalesBot:
             HAVING total_stock > 0
             ORDER BY category
         ''')
-        
+
         categories = c.fetchall()
         conn.close()
-        
+
         if not categories:
             await query.edit_message_text(
-                "⚠️ 暂无商品\n\n请稍后再试！",
+                "⚠️ 暂无商品\n\n请稍后再试!",
                 reply_markup=InlineKeyboardMarkup([[
                     InlineKeyboardButton(get_text('btn_back', lang), callback_data="back_main")
                 ]])
             )
             return
-        
+
         keyboard = []
         for cat, stock in categories:
             translated_cat = translate_category_name(cat, lang)
@@ -351,20 +351,20 @@ class SalesBot:
                 f"{translated_cat} 【{stock}】",
                 callback_data=f"cat_{cat}"
             )])
-        
+
         keyboard.append([InlineKeyboardButton(get_text('btn_back', lang), callback_data="show_product_overview")])
-        
+
         await query.edit_message_text(
             get_text('select_category', lang),
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
-    
+
     async def _show_products(self, query, category):
         user_id = query.from_user.id
         lang = self.get_user_language(user_id) or 'zh'
         conn = self.db.get_connection()
         c = conn.cursor()
-        
+
         c.execute('''
             SELECT id, name, selling_price, stock
             FROM products
@@ -372,10 +372,10 @@ class SalesBot:
             ORDER BY selling_price
             LIMIT 50
         ''', (category,))
-        
+
         products = c.fetchall()
         conn.close()
-        
+
         if not products:
             await query.edit_message_text(
                 f"⚠️ 分类 {category} 暂无商品",
@@ -385,43 +385,43 @@ class SalesBot:
                 ]])
             )
             return
-        
+
         keyboard = []
         for pid, name, price, stock in products:
             keyboard.append([InlineKeyboardButton(
                 f"{name} 【{stock}】- ${price}",
                 callback_data=f"buy_{pid}"
             )])
-        
+
         keyboard.append([
             InlineKeyboardButton(get_text('btn_back_category', lang), callback_data="show_categories"),
             InlineKeyboardButton(get_text('btn_main_menu', lang), callback_data="back_main")
         ])
-        
+
         await query.edit_message_text(
-            f"📱 {category} 商品列表：\n\n"
+            f"📱 {category} 商品列表:\n\n"
             f"共 {len(products)} 个商品",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
-    
+
     async def _buy_product(self, query, product_id):
         user_id = query.from_user.id
         lang = self.get_user_language(user_id) or 'zh'
         user_id = query.from_user.id
-        
+
         # 查询商品
         conn = self.db.get_connection()
         c = conn.cursor()
-        
+
         c.execute('''
             SELECT name, selling_price, stock
             FROM products
             WHERE id = ? AND is_active = 1
         ''', (product_id,))
-        
+
         product = c.fetchone()
         conn.close()
-        
+
         if not product:
             await query.edit_message_text(
                 "❌ 商品不存在或已下架",
@@ -430,9 +430,9 @@ class SalesBot:
                 ]])
             )
             return
-        
+
         name, selling_price, stock = product
-        
+
         if stock <= 0:
             await query.edit_message_text(
                 f"❌ 商品 {name} 已售罄",
@@ -441,8 +441,8 @@ class SalesBot:
                 ]])
             )
             return
-        
-        # 设置用户状态：等待输入数量
+
+        # 设置用户状态:等待输入数量
         self.user_states[user_id] = {
             'action': 'buy_quantity',
             'product_id': product_id,
@@ -450,7 +450,7 @@ class SalesBot:
             'price': selling_price,
             'stock': stock
         }
-        
+
         await query.edit_message_text(
             f"📱 {get_text('product_info', lang)}\n\n"
             f"{get_text('product_label', lang)}: {translate_product_name(name, lang)}\n"
@@ -461,13 +461,13 @@ class SalesBot:
                 InlineKeyboardButton(get_text('btn_cancel', lang), callback_data="show_categories")
             ]])
         )
-    
+
     async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = update.effective_user.id
         lang = self.get_user_language(user_id) or 'zh'
         user_id = update.effective_user.id
         text = update.message.text.strip()
-        
+
         # 优先处理管理员输入
         admin_waiting = context.user_data.get('admin_waiting_for')
         if admin_waiting:
@@ -481,30 +481,30 @@ class SalesBot:
             elif admin_waiting == 'broadcast_button':
                 await self.admin_handler.handle_broadcast_button(update, context)
                 return
-        
+
         # 优先检查是否是充值流程
         if context.user_data.get('waiting_for') == 'recharge_amount':
             await self.recharge_handler.handle_amount_message(update, context)
             return
-        
-        # 检查是否是 TxID（64 位十六进制）
+
+        # 检查是否是 TxID(64 位十六进制)
         if len(text) == 64 and all(c in '0123456789abcdefABCDEF' for c in text):
             await self.recharge_handler.handle_txid_verification(update, context)
             return
-        
-        # 检查用户状态（购买数量输入）
+
+        # 检查用户状态(购买数量输入)
         if user_id not in self.user_states:
             return
-        
+
         state = self.user_states[user_id]
-        
+
         if state['action'] == 'buy_quantity':
             await self._process_quantity(update, state, text)
-    
+
     async def _process_quantity(self, update, state, text):
         """处理购买数量输入"""
         user_id = update.effective_user.id
-        
+
         # 验证数量
         try:
             quantity = int(text)
@@ -519,63 +519,63 @@ class SalesBot:
                 get_text('invalid_number', lang)
             )
             return
-        
+
         # 计算总价
         total_price = state['price'] * quantity
-        
+
         # 检查余额
         conn = self.db.get_connection()
         c = conn.cursor()
         c.execute('SELECT balance FROM users WHERE user_id = ?', (user_id,))
         user = c.fetchone()
         balance = user[0] if user else 0
-        
+
         if balance < total_price:
             await update.message.reply_text(
                 f"❌ 余额不足\n\n"
-                f"总价：${total_price:.2f}\n"
-                f"当前余额：${balance:.2f}\n"
-                f"需要充值：${total_price - balance:.2f}"
+                f"总价:${total_price:.2f}\n"
+                f"当前余额:${balance:.2f}\n"
+                f"需要充值:${total_price - balance:.2f}"
             )
             conn.close()
             del self.user_states[user_id]
             return
-        
+
         # 创建订单
         c.execute('''
             INSERT INTO orders (user_id, product_id, product_name, quantity, unit_price, total_price, status)
             VALUES (?, ?, ?, ?, ?, ?, 'processing')
         ''', (user_id, state['product_id'], state['product_name'], quantity, state['price'], total_price))
-        
+
         order_id = c.lastrowid
-        
+
         # 扣除余额
         new_balance = balance - total_price
         c.execute('UPDATE users SET balance = ? WHERE user_id = ?', (new_balance, user_id))
-        
+
         # 记录余额变动
         c.execute('''
             INSERT INTO balance_logs (user_id, amount, type, order_id, note)
             VALUES (?, ?, 'purchase', ?, ?)
         ''', (user_id, -total_price, order_id, f'购买 {state["product_name"]} x{quantity}'))
-        
+
         conn.commit()
         conn.close()
-        
+
         # 清除状态
         del self.user_states[user_id]
-        
+
         processing_msg = await update.message.reply_text(
             f"{get_text('processing_order', lang)}\n\n"
-            f"🛍 商品：{state['product_name']}\n"
-            f"💰 单价：${state['price']}\n"
-            f"📦 数量：{quantity}\n"
-            f"💵 总价：${total_price:.2f}\n"
-            f"📋 订单号：{order_id}\n\n"
-            f"♻️正在打包检查账号存活，请耐心稍候..."
+            f"🛍 商品:{state['product_name']}\n"
+            f"💰 单价:${state['price']}\n"
+            f"📦 数量:{quantity}\n"
+            f"💵 总价:${total_price:.2f}\n"
+            f"📋 订单号:{order_id}\n\n"
+            f"♻️正在打包检查账号存活,请耐心稍候..."
         )
-        
-        # 调用代购模块（传递 user_id 和 order_id 用于隔离）
+
+        # 调用代购模块(传递 user_id 和 order_id 用于隔离)
         try:
             files = await self.purchaser.purchase(
                 product_id=state['product_id'],
@@ -583,24 +583,24 @@ class SalesBot:
                 user_id=user_id,
                 order_id=order_id
             )
-            
+
             # 更新订单状态
             conn = self.db.get_connection()
             c = conn.cursor()
             c.execute('''
-                UPDATE orders 
+                UPDATE orders
                 SET status = 'completed', completed_at = CURRENT_TIMESTAMP
                 WHERE id = ?
             ''', (order_id,))
             conn.commit()
             conn.close()
-            
+
             # 删除"订单处理中..."的消息
             try:
                 await processing_msg.delete()
             except:
-                pass  # 如果删除失败，忽略错误
-            
+                pass  # 如果删除失败,忽略错误
+
             # 发送购买成功消息
             caption = (
                 f"{get_text('purchase_product', lang)}: {translated_product_name}\n"
@@ -608,16 +608,16 @@ class SalesBot:
                 f"{get_text('purchase_quantity', lang)}: {quantity}\n\n"
                 f"{get_text('files_packaged', lang)} {quantity}\n"
             )
-            
+
             await update.message.reply_text(caption)
-            
+
             # 发送 3 个文件
             for file_info in files:
                 await update.message.reply_document(
                     document=open(file_info['path'], 'rb'),
                     filename=file_info['name']
                 )
-            
+
             # 发送使用说明
             await update.message.reply_text(
                 f"{get_text('protocol_note', lang)}\n"
@@ -626,89 +626,89 @@ class SalesBot:
                 f"{get_text('cache_cleared', lang)}\n"
                 f"{get_text('keep_files_safe', lang)}"
             )
-            
+
         except Exception as e:
             # 删除"订单处理中..."的消息
             try:
                 await processing_msg.delete()
             except:
                 pass
-            
+
             # 退款
             conn = self.db.get_connection()
             c = conn.cursor()
             c.execute('UPDATE users SET balance = balance + ? WHERE user_id = ?', (total_price, user_id))
             c.execute('''
-                UPDATE orders 
+                UPDATE orders
                 SET status = 'failed', error_message = ?
                 WHERE id = ?
             ''', (str(e), order_id))
             c.execute('''
                 INSERT INTO balance_logs (user_id, amount, type, order_id, note)
                 VALUES (?, ?, 'refund', ?, ?)
-            ''', (user_id, total_price, order_id, f'退款：{str(e)}'))
+            ''', (user_id, total_price, order_id, f'退款:{str(e)}'))
             conn.commit()
             conn.close()
-            
+
             await update.message.reply_text(
                 f"{get_text('purchase_failed', lang)}\n\n"
                 f"{get_text('error_occurred', lang)}: {str(e)}\n\n"
                 f"{get_text('status_refunded', lang)} ${total_price:.2f}"
             )
-    
+
     async def _show_recharge(self, query):
         user_id = query.from_user.id
         lang = self.get_user_language(user_id) or 'zh'
         """显示充值方式选择"""
         keyboard = []
-        
-        # TRC20 充值（始终可用）
+
+        # TRC20 充值(始终可用)
         keyboard.append([InlineKeyboardButton("💎 USDT TRC20 充值", callback_data='recharge_method_trc20')])
-        
-        # OKPay 充值（如果已配置）
+
+        # OKPay 充值(如果已配置)
         if hasattr(Config, 'OKPAY_SHOP_ID') and Config.OKPAY_SHOP_ID:
             keyboard.append([InlineKeyboardButton(get_text('okpay_recharge', lang), callback_data='recharge_method_okpay')])
-        
+
         keyboard.append([InlineKeyboardButton("🏠 返回主菜单", callback_data='back_main')])
-        
+
         try:
             await query.edit_message_text(
                 '💰 **选择充值方式**\n\n'
                 '💎 **USDT TRC20 充值**\n'
-                '   - 去中心化，资金直达\n'
-                '   - 到账时间：1-3 分钟\n'
+                '   - 去中心化,资金直达\n'
+                '   - 到账时间:1-3 分钟\n'
                 '   - 需要复制交易哈希验证\n\n'
                 + ('⚡ **OKPay 快速充值**\n'
-                   '   - 点击支付后，点"我已支付"查询\n'
-                   '   - 到账时间：即时（需手动确认）\n'
-                   '   - 一键支付，简单快捷\n\n' 
+                   '   - 点击支付后,点"我已支付"查询\n'
+                   '   - 到账时间:即时(需手动确认)\n'
+                   '   - 一键支付,简单快捷\n\n'
                    if hasattr(Config, 'OKPAY_SHOP_ID') and Config.OKPAY_SHOP_ID else '') +
-                f'最低充值：{Config.MIN_RECHARGE_AMOUNT} USDT',
+                f'最低充值:{Config.MIN_RECHARGE_AMOUNT} USDT',
                 reply_markup=InlineKeyboardMarkup(keyboard),
                 parse_mode='Markdown'
             )
         except Exception as e:
-            # 如果消息没有变化，忽略错误
+            # 如果消息没有变化,忽略错误
             if "Message is not modified" not in str(e):
                 raise
-    
+
     async def _cancel_recharge(self, query, order_id):
         """取消充值订单"""
         user_id = query.from_user.id
-        
+
         conn = self.db.get_connection()
         c = conn.cursor()
-        
+
         c.execute('''
             UPDATE recharge_orders
             SET status = 'cancelled'
             WHERE id = ? AND user_id = ? AND status = 'pending'
         ''', (order_id, user_id))
-        
+
         conn.commit()
         affected = c.rowcount
         conn.close()
-        
+
         if affected > 0:
             await query.edit_message_text(
                 f'✅ 已取消充值订单 #{order_id}',
@@ -718,15 +718,15 @@ class SalesBot:
             )
         else:
             await query.answer('❌ 订单不存在或已处理', show_alert=True)
-    
+
     async def _show_orders(self, query):
         user_id = query.from_user.id
         lang = self.get_user_language(user_id) or 'zh'
         user_id = query.from_user.id
-        
+
         conn = self.db.get_connection()
         c = conn.cursor()
-        
+
         c.execute('''
             SELECT id, product_name, total_price, status, created_at
             FROM orders
@@ -734,10 +734,10 @@ class SalesBot:
             ORDER BY created_at DESC
             LIMIT 10
         ''', (user_id,))
-        
+
         orders = c.fetchall()
         conn.close()
-        
+
         if not orders:
             await query.edit_message_text(
                 "📋 暂无订单",
@@ -746,7 +746,7 @@ class SalesBot:
                 ]])
             )
             return
-        
+
         text = "📋 我的订单\n\n"
         for oid, name, price, status, created in orders:
             status_emoji = {
@@ -755,17 +755,17 @@ class SalesBot:
                 'failed': '❌',
                 'pending': '⏸'
             }.get(status, '❓')
-            
+
             text += f"{status_emoji} #{oid} - {name}\n"
             text += f"   ${price} | {created[:16]}\n\n"
-        
+
         await query.edit_message_text(
             text,
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton(get_text('btn_back', lang), callback_data="back_main")
             ]])
         )
-    
+
     async def _show_help(self, query):
         """显示帮助"""
         await query.edit_message_text(
@@ -775,12 +775,12 @@ class SalesBot:
             "3. 确认购买\n"
             "4. 自动代购\n"
             "5. 接收账号文件\n\n"
-            "如有问题，请联系管理员。",
+            "如有问题,请联系管理员。",
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton(get_text('btn_back', lang), callback_data="back_main")
             ]])
         )
-    
+
     async def _back_to_main(self, query):
         """返回主菜单"""
         user_id = query.from_user.id
@@ -790,51 +790,51 @@ class SalesBot:
         """保存用户"""
         conn = self.db.get_connection()
         c = conn.cursor()
-        
+
         # 使用 INSERT OR IGNORE 避免覆盖余额
         c.execute('''
             INSERT OR IGNORE INTO users (user_id, username, first_name, last_name, last_activity)
             VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
         ''', (user.id, user.username, user.first_name, user.last_name))
-        
-        # 如果用户已存在，只更新活跃时间和用户名
+
+        # 如果用户已存在,只更新活跃时间和用户名
         c.execute('''
-            UPDATE users 
+            UPDATE users
             SET username = ?, first_name = ?, last_name = ?, last_activity = CURRENT_TIMESTAMP
             WHERE user_id = ?
         ''', (user.username, user.first_name, user.last_name, user.id))
-        
+
         conn.commit()
         conn.close()
-    
+
     def _get_balance(self, user_id):
         """获取用户余额"""
         conn = self.db.get_connection()
         c = conn.cursor()
-        
+
         c.execute('SELECT balance FROM users WHERE user_id = ?', (user_id,))
         result = c.fetchone()
         conn.close()
-        
+
         return result[0] if result else 0
 
     async def _cancel_okpay_recharge(self, query, order_id):
         """取消 OKPay 充值订单"""
         user_id = query.from_user.id
-        
+
         conn = self.db.get_connection()
         c = conn.cursor()
-        
+
         c.execute('''
             UPDATE okpay_orders
             SET status = 'cancelled'
             WHERE id = ? AND user_id = ? AND status = 'pending'
         ''', (order_id, user_id))
-        
+
         conn.commit()
         affected = c.rowcount
         conn.close()
-        
+
         if affected > 0:
             await query.edit_message_text(
                 f'✅ 已取消 OKPay 充值订单 #{order_id}',
@@ -844,31 +844,31 @@ class SalesBot:
             )
         else:
             await query.answer('❌ 订单不存在或已处理', show_alert=True)
-    
+
     async def _handle_custom_button(self, query):
         """处理自定义按钮点击"""
         button_id = int(query.data.split('_')[2])
-        
+
         # 查询按钮信息
         conn = self.db.get_connection()
         c = conn.cursor()
-        
+
         c.execute('''
             SELECT text, type, content
             FROM custom_buttons
             WHERE id = ? AND is_active = 1
         ''', (button_id,))
-        
+
         result = c.fetchone()
         conn.close()
-        
+
         if not result:
             await query.answer('❌ 按钮不存在', show_alert=True)
             return
-        
+
         text, btn_type, content = result
-        
-        # 消息类型按钮，回复内容
+
+        # 消息类型按钮,回复内容
         if btn_type == 'message':
             await query.answer()
             await query.edit_message_text(
@@ -879,29 +879,29 @@ class SalesBot:
                 parse_mode='Markdown'
             )
         else:
-            # URL 类型（不应该走到这里，因为 URL 按钮直接跳转）
+            # URL 类型(不应该走到这里,因为 URL 按钮直接跳转)
             await query.answer('❌ 按钮类型错误', show_alert=True)
 
-    
+
     async def show_language_selection(self, update):
         """显示语言选择菜单"""
         keyboard = [
             [InlineKeyboardButton('🇺🇸 English', callback_data='lang_en')],
             [InlineKeyboardButton('🇨🇳 中文简体', callback_data='lang_zh')]
         ]
-        
+
         await update.message.reply_text(
             get_text('select_language', 'zh'),
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
-    
+
     async def show_main_menu(self, update_or_query, user_id, lang):
-        """显示主菜单（原版简洁布局）"""
+        """显示主菜单(原版简洁布局)"""
         balance = self._get_balance(user_id)
         customer_service_url = self.db.get_setting('customer_service_url', 'https://t.me/id2uu')
-        start_message = self.db.get_setting('start_message', '👋 欢迎使用账号购买系统！\n\n🛍 请选择服务：' if lang == 'zh' else '👋 Welcome to Account Store!\n\n🛍 Please select service:')
-        
-        # 原版布局：4个按钮 + 自定义按钮（语言切换移到最底部）
+        start_message = self.db.get_setting('start_message', '👋 欢迎使用账号购买系统!\n\n🛍 请选择服务:' if lang == 'zh' else '👋 Welcome to Account Store!\n\n🛍 Please select service:')
+
+        # 原版布局:4个按钮 + 自定义按钮(语言切换移到最底部)
         keyboard = [
             [InlineKeyboardButton(get_text('btn_products', lang), callback_data='show_product_overview')],
             [
@@ -910,7 +910,7 @@ class SalesBot:
             ],
             [InlineKeyboardButton(get_text('btn_support', lang), url=customer_service_url)]
         ]
-        
+
         # 自定义按钮
         custom_buttons = self.db.get_custom_buttons()
         for btn in custom_buttons:
@@ -918,13 +918,13 @@ class SalesBot:
                 keyboard.append([InlineKeyboardButton(btn['text'], url=btn['content'])])
             else:
                 keyboard.append([InlineKeyboardButton(btn['text'], callback_data=f"custom_btn_{btn['id']}")])
-        
+
         # 语言切换按钮放在最底部
         keyboard.append([InlineKeyboardButton(get_text('btn_language', lang), callback_data='change_language')])
-        
+
         # 使用原始布局的消息格式
-        text = f"{start_message}\n\n📱 用户ID：`{user_id}`\n💰 当前余额：**${balance:.2f} USDT**"
-        
+        text = f"{start_message}\n\n📱 用户ID:`{user_id}`\n💰 当前余额:**${balance:.2f} USDT**"
+
         if hasattr(update_or_query, 'edit_message_text'):
             await update_or_query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
         else:
