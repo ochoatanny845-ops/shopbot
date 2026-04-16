@@ -282,6 +282,8 @@ class RechargeHandler:
     async def _send_payment_info(self, update: Update, amount: float, order_id: int):
         """发送支付信息，返回消息 ID 列表"""
         message_ids = []  # 记录所有消息 ID，用于后续删除
+        user_id = update.effective_user.id
+        lang = self._get_user_language(user_id)
         
         # 动态获取收款地址
         recipient_address = self.get_recipient_address()
@@ -305,20 +307,20 @@ class RechargeHandler:
         
         # 发送支付信息
         message = (
-            f'💰 **充值订单 #{order_id}**\n\n'
-            f'充值金额：`{amount}` USDT\n'
-            f'网络类型：TRC20 (Tron)\n'
-            f'收款地址：\n`{recipient_address}`\n\n'
-            f'⏰ **订单时间：**\n'
-            f'创建时间：{now.strftime("%Y-%m-%d %H:%M:%S")}\n'
-            f'过期时间：{expire_time.strftime("%Y-%m-%d %H:%M:%S")}\n'
-            f'有效期：**10 分钟**\n\n'
-            f'⚠️ **重要提示：**\n'
-            f'1️⃣ 请确保使用 **TRC20 网络**\n'
-            f'2️⃣ 转账完成后，发送交易哈希（TxID）\n'
-            f'3️⃣ 系统将自动验证并入账\n'
-            f'4️⃣ 超过 10 分钟订单自动失效\n\n'
-            f'📝 交易哈希格式示例：\n'
+            f'{get_text("trc20_order_title", lang)} #{order_id}\n\n'
+            f'{get_text("recharge_amount_prefix", lang)} `{amount}` USDT\n'
+            f'{get_text("network_type", lang)} TRC20 (Tron)\n'
+            f'{get_text("recipient_address_label", lang)}\n`{recipient_address}`\n\n'
+            f'{get_text("order_time", lang)}\n'
+            f'{get_text("created_time", lang)} {now.strftime("%Y-%m-%d %H:%M:%S")}\n'
+            f'{get_text("expire_time_label", lang)} {expire_time.strftime("%Y-%m-%d %H:%M:%S")}\n'
+            f'{get_text("validity_period_label", lang)} **10 {get_text("minutes_suffix", lang)}**\n\n'
+            f'{get_text("important_reminder", lang)}\n'
+            f'{get_text("trc20_reminder_1", lang)}\n'
+            f'{get_text("trc20_reminder_2", lang)}\n'
+            f'{get_text("trc20_reminder_3", lang)}\n'
+            f'{get_text("trc20_reminder_4", lang)}\n\n'
+            f'{get_text("tx_hash_format_example", lang)}\n'
             f'`7a1b2c3d4e5f...`'
         )
         
@@ -332,11 +334,11 @@ class RechargeHandler:
         
         # 提示等待 TxID
         tip_msg = await update.message.reply_text(
-            '⏳ 请完成转账后，发送交易哈希（TxID）给我\n\n'
-            f'💡 在钱包中复制交易哈希即可\n'
-            f'⏰ 请在 {expire_time.strftime("%H:%M:%S")} 前提交',
+            f'{get_text("tip_after_transfer", lang)}\n\n'
+            f'{get_text("tip_copy_in_wallet", lang)}\n'
+            f'{get_text("tip_submit_before", lang)} {expire_time.strftime("%H:%M:%S")} {get_text("tip_submit_suffix", lang)}',
             reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("❌ 取消充值", callback_data=f'cancel_recharge_{order_id}')
+                InlineKeyboardButton(get_text("cancel_recharge_btn", lang), callback_data=f'cancel_recharge_{order_id}')
             ]])
         )
         message_ids.append(tip_msg.message_id)
