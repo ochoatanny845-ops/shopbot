@@ -304,7 +304,7 @@ class SalesBot:
         
         keyboard = [
             [InlineKeyboardButton(
-                f"TG💎直登+协议+api {get_text('available_quantity', lang)} ({total_stock})",
+                f"TG💎直登+协议+api {get_text('available_quantity', lang)} ({total_stock})" if lang == 'en' else f"TG💎直登+协议+api 百万库存 ({total_stock}个)",
                 callback_data="show_categories"
             )],
             [InlineKeyboardButton("🏠 返回主菜单", callback_data="back_main")]
@@ -894,21 +894,19 @@ class SalesBot:
         )
     
     async def show_main_menu(self, update_or_query, user_id, lang):
-        """显示主菜单"""
+        """显示主菜单（原版简洁布局）"""
         balance = self._get_balance(user_id)
         customer_service_url = self.db.get_setting('customer_service_url', 'https://t.me/id2uu')
+        start_message = self.db.get_setting('start_message', '👋 欢迎使用账号购买系统！\n\n🛍 请选择服务：' if lang == 'zh' else '👋 Welcome to Account Store!\n\n🛍 Please select service:')
         
+        # 原版布局：4个按钮 + 自定义按钮（语言切换移到最底部）
         keyboard = [
             [InlineKeyboardButton(get_text('btn_products', lang), callback_data='show_product_overview')],
             [
                 InlineKeyboardButton(get_text('btn_recharge', lang), callback_data='recharge'),
                 InlineKeyboardButton(get_text('btn_orders', lang), callback_data='orders')
             ],
-            [
-                InlineKeyboardButton(f"{get_text('btn_balance', lang)}: ${balance:.2f}", callback_data='balance'),
-                InlineKeyboardButton(get_text('btn_support', lang), url=customer_service_url)
-            ],
-            [InlineKeyboardButton(get_text('btn_language', lang), callback_data='change_language')]
+            [InlineKeyboardButton(get_text('btn_support', lang), url=customer_service_url)]
         ]
         
         # 自定义按钮
@@ -919,9 +917,13 @@ class SalesBot:
             else:
                 keyboard.append([InlineKeyboardButton(btn['text'], callback_data=f"custom_btn_{btn['id']}")])
         
-        text = f"{get_text('main_menu_title', lang)}\n\n📱 {get_text('current_language', lang)}: {'🇨🇳 中文简体' if lang == 'zh' else '🇺🇸 English'}"
+        # 语言切换按钮放在最底部
+        keyboard.append([InlineKeyboardButton(get_text('btn_language', lang), callback_data='change_language')])
+        
+        # 使用原始布局的消息格式
+        text = f"{start_message}\n\n📱 用户ID：`{user_id}`\n💰 当前余额：**${balance:.2f} USDT**"
         
         if hasattr(update_or_query, 'edit_message_text'):
-            await update_or_query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+            await update_or_query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
         else:
-            await update_or_query.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+            await update_or_query.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
