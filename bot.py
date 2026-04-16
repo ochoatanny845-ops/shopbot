@@ -304,14 +304,14 @@ class SalesBot:
 
         keyboard = [
             [InlineKeyboardButton(
-                f"TG💎{get_text('product_types', lang)} {get_text('available_quantity', lang)} ({total_stock})",
+                f"💎 TG {get_text('product_types', lang)} ({total_stock})",
                 callback_data="show_categories"
             )],
             [InlineKeyboardButton(get_text('btn_back', lang), callback_data="back_main")]
         ]
 
         await query.edit_message_text(
-            f"📱 **{get_text('btn_products', lang)}**\n\n"
+            f"🛒 {get_text('btn_products', lang)}\n\n"
             f"{get_text('select_product_type', lang)}",
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode='Markdown'
@@ -535,10 +535,10 @@ class SalesBot:
 
         if balance < total_price:
             await update.message.reply_text(
-                f"❌ 余额不足\n\n"
-                f"总价:${total_price:.2f}\n"
-                f"当前余额:${balance:.2f}\n"
-                f"需要充值:${total_price - balance:.2f}"
+                f"❌ {get_text('insufficient_balance', lang)}\n\n"
+                f"{get_text('total_price_label', lang)} ${total_price:.2f}\n"
+                f"{get_text('current_balance', lang)} ${balance:.2f}\n"
+                f"{get_text('need_recharge', lang)} ${total_price - balance:.2f}"
             )
             conn.close()
             del self.user_states[user_id]
@@ -568,9 +568,13 @@ class SalesBot:
         # 清除状态
         del self.user_states[user_id]
 
+        # 翻译商品名
+        from language import translate_product_name
+        translated_product_name_display = translate_product_name(state['product_name'], lang)
+        
         processing_msg = await update.message.reply_text(
             f"{get_text('processing_order', lang)}\n\n"
-            f"{get_text('product_label', lang)} {state['product_name']}\n"
+            f"{get_text('product_label', lang)} {translated_product_name_display}\n"
             f"{get_text('unit_price_label', lang)} ${state['price']}\n"
             f"{get_text('quantity_label', lang)} {quantity}\n"
             f"{get_text('total_price_label', lang)} ${total_price:.2f}\n"
@@ -705,6 +709,7 @@ class SalesBot:
     async def _cancel_recharge(self, query, order_id):
         """取消充值订单"""
         user_id = query.from_user.id
+        lang = self.get_user_language(user_id) or 'zh'
 
         conn = self.db.get_connection()
         c = conn.cursor()
@@ -721,13 +726,13 @@ class SalesBot:
 
         if affected > 0:
             await query.edit_message_text(
-                f'✅ 已取消充值订单 #{order_id}',
+                f'✅ {get_text("recharge_cancelled", lang)} #{order_id}',
                 reply_markup=InlineKeyboardMarkup([[
                     InlineKeyboardButton(get_text('btn_back', lang), callback_data='back_main')
                 ]])
             )
         else:
-            await query.answer('❌ 订单不存在或已处理', show_alert=True)
+            await query.answer(f'❌ {get_text("order_not_found_or_processed", lang)}', show_alert=True)
 
     async def _show_orders(self, query):
         user_id = query.from_user.id

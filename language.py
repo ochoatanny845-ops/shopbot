@@ -79,6 +79,10 @@ LANG = {
         'product_price': '💰 商品价格',
         'purchase_quantity': '🛍 购买数量',
         'files_packaged': '🗂文件打包完成 ♻️存活账号',
+        'insufficient_balance': '余额不足',
+        'need_recharge': '需要充值:',
+        'recharge_cancelled': '已取消充值订单',
+        'order_not_found_or_processed': '订单不存在或已处理',
         
         # ===== 使用说明 Usage Instructions =====
         'protocol_note': '📄 协议号: 适用于软件或脚本',
@@ -256,6 +260,10 @@ LANG = {
         'quantity': '📦 Quantity',
         'total_price': '💵 Total',
         'order_id': '📋 Order ID',
+        'insufficient_balance': 'Insufficient Balance',
+        'need_recharge': 'Need Recharge:',
+        'recharge_cancelled': 'Recharge order cancelled',
+        'order_not_found_or_processed': 'Order not found or already processed',
         'purchase_product': '🗂 Purchase Product',
         'product_price': '💰 Product Price',
         'purchase_quantity': '🛍 Purchase Quantity',
@@ -697,6 +705,13 @@ def translate_product_name(product_name, target_lang='zh'):
         '精品月号': 'Premium Monthly',
         '全新一手': 'Brand New',
         '满月': 'Full Month',
+        
+        # 文件类型（用户确认）
+        ' 直登号': ' tdata',
+        ' 协议号': ' session',
+        ' API ': ' api ',
+        '直登号': 'tdata',
+        '协议号': 'session',
         
         # 天数
         '45天以上': '45+ Days',

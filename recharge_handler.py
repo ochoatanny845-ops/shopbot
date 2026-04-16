@@ -21,6 +21,9 @@ class RechargeHandler:
     def __init__(self):
         # 数据库
         self.db = Database()
+        # 充值处理器
+        self.trc20 = TRC20Recharge()
+        self.okpay = OKPayHandler()
         # 语言支持
         self._bot_db = None
     
