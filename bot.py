@@ -848,6 +848,8 @@ class SalesBot:
     async def _handle_custom_button(self, query):
         """处理自定义按钮点击"""
         button_id = int(query.data.split('_')[2])
+        user_id = query.from_user.id
+        lang = self.get_user_language(user_id) or 'zh'
 
         # 查询按钮信息
         conn = self.db.get_connection()
@@ -871,6 +873,14 @@ class SalesBot:
         # 消息类型按钮,回复内容
         if btn_type == 'message':
             await query.answer()
+            
+            # 翻译售后规则内容
+            if '售后规则' in text and lang == 'en':
+                content = """🔥 First-time buyers are advised to test with a small quantity to avoid unnecessary misunderstandings!
+⚠️ Purchase Notice: All accounts are checked for validity before delivery. Dead accounts are automatically refunded!
+‼️ In case of account freeze, the delivery time shall prevail!
+‼️ Please contact customer service within 30 minutes, otherwise after-sales support will be forfeited!"""
+            
             await query.edit_message_text(
                 content,
                 reply_markup=InlineKeyboardMarkup([[
@@ -914,10 +924,15 @@ class SalesBot:
         # 自定义按钮
         custom_buttons = self.db.get_custom_buttons()
         for btn in custom_buttons:
+            # 翻译按钮文字
+            btn_text = btn['text']
+            if '售后规则' in btn_text and lang == 'en':
+                btn_text = '⚠️ After-Sales Rules'
+            
             if btn['type'] == 'url':
-                keyboard.append([InlineKeyboardButton(btn['text'], url=btn['content'])])
+                keyboard.append([InlineKeyboardButton(btn_text, url=btn['content'])])
             else:
-                keyboard.append([InlineKeyboardButton(btn['text'], callback_data=f"custom_btn_{btn['id']}")])
+                keyboard.append([InlineKeyboardButton(btn_text, callback_data=f"custom_btn_{btn['id']}")])
 
         # 语言切换按钮放在最底部
         keyboard.append([InlineKeyboardButton(get_text('btn_language', lang), callback_data='change_language')])
