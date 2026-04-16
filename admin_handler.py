@@ -37,7 +37,10 @@ class AdminHandler:
                 InlineKeyboardButton("📢 群发通知", callback_data='admin_broadcast'),
                 InlineKeyboardButton("📝 主菜单编辑", callback_data='admin_edit_start')
             ],
-            [InlineKeyboardButton("🎛️ 自定义按钮", callback_data='admin_custom_buttons')],
+            [
+                InlineKeyboardButton("🎛️ 自定义按钮", callback_data='admin_custom_buttons'),
+                InlineKeyboardButton("ℹ️ 信息配置", callback_data='admin_info_config')
+            ],
             [InlineKeyboardButton("🏠 返回主菜单", callback_data='back_main')]
         ]
         
@@ -174,12 +177,18 @@ class AdminHandler:
             await self._show_users(query, context)
         elif data == 'admin_settings':
             await self._show_settings(query, context)
+        elif data == 'admin_info_config':
+            await self._show_info_config(query, context)
         elif data == 'admin_broadcast':
             await self._start_broadcast(query, context)
         elif data == 'admin_edit_start':
             await self._edit_start_message(query, context)
         elif data == 'admin_edit_trc20':
             await self._edit_trc20_address(query, context)
+        elif data == 'admin_edit_notification':
+            await self._edit_notification_url(query, context)
+        elif data == 'admin_edit_customer_service':
+            await self._edit_customer_service_url(query, context)
         elif data == 'admin_edit_start_text':
             await self._edit_start_text(query, context)
         elif data == 'admin_custom_buttons':
@@ -201,7 +210,10 @@ class AdminHandler:
                     InlineKeyboardButton("📢 群发通知", callback_data='admin_broadcast'),
                     InlineKeyboardButton("📝 主菜单编辑", callback_data='admin_edit_start')
                 ],
-                [InlineKeyboardButton("🎛️ 自定义按钮", callback_data='admin_custom_buttons')],
+                [
+                    InlineKeyboardButton("🎛️ 自定义按钮", callback_data='admin_custom_buttons'),
+                    InlineKeyboardButton("ℹ️ 信息配置", callback_data='admin_info_config')
+                ],
                 [InlineKeyboardButton("🏠 返回主菜单", callback_data='back_main')]
             ]
             
@@ -877,7 +889,37 @@ class AdminHandler:
         if waiting_for in ['custom_button_text', 'custom_button_message', 'custom_button_url']:
             return await self.handle_custom_button_input(update, context)
         
-        if waiting_for == 'trc20_address':
+        if waiting_for == 'notification_url':
+            # 保存订单通知链接
+            self.db.set_setting('order_notification_url', text)
+            
+            await update.message.reply_text(
+                f'✅ <b>订单通知链接已更新</b>\n\n'
+                f'新链接：<code>{text}</code>\n\n'
+                '修改已生效',
+                parse_mode='HTML'
+            )
+            
+            # 清除状态
+            context.user_data['admin_waiting_for'] = None
+            return True
+        
+        elif waiting_for == 'customer_service_url':
+            # 保存官方客服链接
+            self.db.set_setting('customer_service_url', text)
+            
+            await update.message.reply_text(
+                f'✅ <b>官方客服链接已更新</b>\n\n'
+                f'新链接：<code>{text}</code>\n\n'
+                '修改已生效',
+                parse_mode='HTML'
+            )
+            
+            # 清除状态
+            context.user_data['admin_waiting_for'] = None
+            return True
+        
+        elif waiting_for == 'trc20_address':
             # 验证 TRC20 地址格式
             if not text.startswith('T') or len(text) != 34:
                 await update.message.reply_text('❌ TRC20 地址格式错误！地址应以 T 开头，长度为 34 位')
@@ -918,3 +960,45 @@ class AdminHandler:
             return True
         
         return False
+    
+    async def _show_info_config(self, query, context):
+        """显示信息配置菜单"""
+        order_notification_url = self.db.get_setting('order_notification_url', 'https://t.me/your_channel')
+        customer_service_url = self.db.get_setting('customer_service_url', 'https://t.me/id2uu')
+        
+        keyboard = [
+            [InlineKeyboardButton("📢 订单通知链接", callback_data='admin_edit_notification')],
+            [InlineKeyboardButton("👩🏻‍💻 官方客服链接", callback_data='admin_edit_customer_service')],
+            [InlineKeyboardButton("🔙 返回", callback_data='admin_back')]
+        ]
+        
+        text = (
+            '<b>ℹ️ 信息配置</b>\n\n'
+            f'<b>📢 订单通知链接：</b>\n<code>{order_notification_url}</code>\n\n'
+            f'<b>👩🏻‍💻 官方客服链接：</b>\n<code>{customer_service_url}</code>\n\n'
+            '💡 点击按钮修改配置'
+        )
+        
+        await query.edit_message_text(
+            text,
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode='HTML'
+        )
+    
+    async def _edit_notification_url(self, query, context):
+        """编辑订单通知链接"""
+        await query.edit_message_text(
+            '<b>📢 修改订单通知链接</b>\n\n'
+            '请发送新的订单通知链接（支持@username或https://链接）：',
+            parse_mode='HTML'
+        )
+        context.user_data['admin_waiting_for'] = 'notification_url'
+    
+    async def _edit_customer_service_url(self, query, context):
+        """编辑官方客服链接"""
+        await query.edit_message_text(
+            '<b>👩🏻‍💻 修改官方客服链接</b>\n\n'
+            '请发送新的官方客服链接（支持@username或https://链接）：',
+            parse_mode='HTML'
+        )
+        context.user_data['admin_waiting_for'] = 'customer_service_url'

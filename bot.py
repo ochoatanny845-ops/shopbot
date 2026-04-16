@@ -1000,8 +1000,7 @@ class SalesBot:
             [
                 InlineKeyboardButton(get_text('btn_recharge', lang), callback_data='recharge'),
                 InlineKeyboardButton(get_text('btn_orders', lang), callback_data='orders')
-            ],
-            [InlineKeyboardButton(get_text('btn_support', lang), url=customer_service_url)]
+            ]
         ]
 
         # 自定义按钮
@@ -1020,7 +1019,7 @@ class SalesBot:
         # 语言切换按钮放在最底部
         keyboard.append([InlineKeyboardButton(get_text('btn_language', lang), callback_data='change_language')])
 
-        # 新格式：欢迎词 + 用户统计 + 链接（使用code格式避免Markdown解析问题）
+        # 新格式：欢迎词 + 用户统计 + 链接（使用Markdown链接格式）
         text = (
             f"{start_message}\n\n"
             f"{get_text('user_stats_id', lang)} `{user_id}`\n\n"
@@ -1028,8 +1027,8 @@ class SalesBot:
             f"{get_text('user_stats_spent', lang)} `${total_spent:.2f}`\n"
             f"{get_text('user_stats_orders', lang)} `{total_orders}`\n"
             f"-------------------------------\n"
-            f"{get_text('order_notification', lang)} `{order_notification_url}`\n"
-            f"{get_text('customer_service', lang)} `{customer_service_url}`"
+            f"{get_text('order_notification', lang)} {order_notification_url}\n"
+            f"{get_text('customer_service', lang)} {customer_service_url}"
         )
 
         if hasattr(update_or_query, 'edit_message_text'):
