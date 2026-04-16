@@ -677,27 +677,35 @@ class SalesBot:
         keyboard = []
 
         # TRC20 充值(始终可用)
-        keyboard.append([InlineKeyboardButton("💎 USDT TRC20 充值", callback_data='recharge_method_trc20')])
+        keyboard.append([InlineKeyboardButton(get_text('trc20_recharge', lang), callback_data='recharge_method_trc20')])
 
         # OKPay 充值(如果已配置)
         if hasattr(Config, 'OKPAY_SHOP_ID') and Config.OKPAY_SHOP_ID:
             keyboard.append([InlineKeyboardButton(get_text('okpay_recharge', lang), callback_data='recharge_method_okpay')])
 
-        keyboard.append([InlineKeyboardButton("🏠 返回主菜单", callback_data='back_main')])
+        keyboard.append([InlineKeyboardButton(get_text('btn_back', lang), callback_data='back_main')])
+
+        text = (
+            f"{get_text('select_recharge_method_title', lang)}\n\n"
+            f"{get_text('trc20_method_title', lang)}\n"
+            f"   - {get_text('trc20_method_desc_1', lang)}\n"
+            f"   - {get_text('trc20_method_desc_2', lang)}\n"
+            f"   - {get_text('trc20_method_desc_3', lang)}\n\n"
+        )
+        
+        if hasattr(Config, 'OKPAY_SHOP_ID') and Config.OKPAY_SHOP_ID:
+            text += (
+                f"{get_text('okpay_method_title', lang)}\n"
+                f"   - {get_text('okpay_method_desc_1', lang)}\n"
+                f"   - {get_text('okpay_method_desc_2', lang)}\n"
+                f"   - {get_text('okpay_method_desc_3', lang)}\n\n"
+            )
+        
+        text += get_text('minimum_recharge_notice', lang)
 
         try:
             await query.edit_message_text(
-                '💰 **选择充值方式**\n\n'
-                '💎 **USDT TRC20 充值**\n'
-                '   - 去中心化,资金直达\n'
-                '   - 到账时间:1-3 分钟\n'
-                '   - 需要复制交易哈希验证\n\n'
-                + ('⚡ **OKPay 快速充值**\n'
-                   '   - 点击支付后,点"我已支付"查询\n'
-                   '   - 到账时间:即时(需手动确认)\n'
-                   '   - 一键支付,简单快捷\n\n'
-                   if hasattr(Config, 'OKPAY_SHOP_ID') and Config.OKPAY_SHOP_ID else '') +
-                f'最低充值:{Config.MIN_RECHARGE_AMOUNT} USDT',
+                text,
                 reply_markup=InlineKeyboardMarkup(keyboard),
                 parse_mode='Markdown'
             )
