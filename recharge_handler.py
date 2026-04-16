@@ -54,10 +54,9 @@ class RechargeHandler:
         return self.db.get_setting('trc20_address', 'TV77o3KfH8DkQNNEsvDLNo765ABcqr3MnM')
     
     async def handle_recharge_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """处理充值请求 - 选择充值方式"""
         user_id = update.effective_user.id if update.effective_user else update.callback_query.from_user.id
         lang = self._get_user_language(user_id)
-        """处理充值请求 - 选择充值方式"""
-        user_id = update.effective_user.id
         
         # 创建充值方式选择按钮
         keyboard = []
