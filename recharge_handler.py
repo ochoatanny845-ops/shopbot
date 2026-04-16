@@ -244,24 +244,24 @@ class RechargeHandler:
         expire_time = datetime.now() + timedelta(minutes=10)
         
         keyboard = [
-            [InlineKeyboardButton("💰 点击支付", url=pay_url)],
-            [InlineKeyboardButton("✅ 我已支付", callback_data=f'check_okpay_{order_id}')],
-            [InlineKeyboardButton("❌ 取消充值", callback_data=f'cancel_okpay_{order_id}')]
+            [InlineKeyboardButton(get_text('btn_click_to_pay', lang), url=pay_url)],
+            [InlineKeyboardButton(get_text('btn_i_have_paid', lang), callback_data=f'check_okpay_{order_id}')],
+            [InlineKeyboardButton(get_text('cancel_recharge_button', lang), callback_data=f'cancel_okpay_{order_id}')]
         ]
         
         await context.bot.send_message(
             chat_id=user_id,
-            text=f'⚡ **OKPay 充值订单**\n\n'
-                 f'订单号：#{order_id}\n'
-                 f'充值金额：`{amount}` USDT\n'
-                 f'有效期：10 分钟\n'
-                 f'过期时间：{expire_time.strftime("%H:%M:%S")}\n\n'
-                 f'💡 **操作步骤：**\n'
-                 f'1️⃣ 点击"💰 点击支付"按钮\n'
-                 f'2️⃣ 在 OKPay 中完成支付\n'
-                 f'3️⃣ **返回这里点击"✅ 我已支付"**\n'
-                 f'4️⃣ 系统查询订单后自动到账\n\n'
-                 f'⚠️ 支付完成后必须点击"我已支付"才能到账',
+            text=f'{get_text("okpay_order_title", lang)}\n\n'
+                 f'{get_text("order_number_prefix", lang)} #{order_id}\n'
+                 f'{get_text("recharge_amount_prefix", lang)} `{amount}` USDT\n'
+                 f'{get_text("validity_period", lang)} 10 {get_text("minutes_suffix", lang)}\n'
+                 f'{get_text("expiry_time", lang)} {expire_time.strftime("%H:%M:%S")}\n\n'
+                 f'{get_text("operation_steps", lang)}\n'
+                 f'{get_text("step_1_click_pay", lang)}\n'
+                 f'{get_text("step_2_complete_payment", lang)}\n'
+                 f'{get_text("step_3_click_confirmed", lang)}\n'
+                 f'{get_text("step_4_auto_arrival", lang)}\n\n'
+                 f'{get_text("payment_reminder", lang)}',
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode='Markdown'
         )
@@ -637,7 +637,7 @@ class RechargeHandler:
             return
         
         # 查询 OKPay 订单状态
-        await query.edit_message_text('🔍 正在查询订单状态...')
+        await query.edit_message_text(get_text('querying_order_status', lang))
         
         result = self.okpay.check_deposit(unique_id)
         
@@ -683,11 +683,11 @@ class RechargeHandler:
             
             # 通知用户
             await query.edit_message_text(
-                f'✅ **充值成功！**\n\n'
-                f'订单号：#{order_id}\n'
-                f'充值金额：{result["amount"]} USDT\n'
-                f'到账时间：{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}\n\n'
-                f'当前余额：${new_balance:.2f}',
+                f'{get_text("recharge_success_title", lang)}\n\n'
+                f'{get_text("order_number_prefix", lang)} #{order_id}\n'
+                f'{get_text("recharge_amount_prefix", lang)} {result["amount"]} USDT\n'
+                f'{get_text("arrival_time", lang)} {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}\n\n'
+                f'{get_text("current_balance_prefix", lang)} ${new_balance:.2f}',
                 parse_mode='Markdown'
             )
         elif result['success'] and result['status'] == 0:
