@@ -945,7 +945,7 @@ class SalesBot:
         keyboard.append([InlineKeyboardButton(get_text('btn_language', lang), callback_data='change_language')])
 
         # 使用原始布局的消息格式
-        text = f"{start_message}\n\n📱 用户ID:`{user_id}`\n💰 当前余额:**${balance:.2f} USDT**"
+        text = f"{start_message}\n\n📱 {get_text('your_id_label', lang)} `{user_id}`\n💰 {get_text('current_balance', lang)} **${balance:.2f} USDT**"
 
         if hasattr(update_or_query, 'edit_message_text'):
             await update_or_query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
