@@ -726,7 +726,6 @@ def translate_product_name(product_name, target_lang='zh'):
         
         # 通用词
         '混合国家': 'Mixed Countries',
-        '共和国': 'Republic',
         '老号': 'Old',
         '月号': 'Monthly',
         '账号': 'Account',
