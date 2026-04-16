@@ -452,13 +452,13 @@ class SalesBot:
         }
         
         await query.edit_message_text(
-            f"📱 商品信息\n\n"
-            f"🛍 商品：{name}\n"
-            f"💰 单价：${selling_price} USDT\n"
-            f"📦 库存：{stock} 个\n\n"
-            f"💬 请输入购买数量（1-{stock}）：",
+            f"📱 {get_text('product_info', lang)}\n\n"
+            f"{get_text('product_label', lang)}: {translate_product_name(name, lang)}\n"
+            f"{get_text('unit_price_label', lang)}: ${selling_price} USDT\n"
+            f"{get_text('stock_label', lang)}: {stock} {get_text('pieces', lang)}\n\n"
+            f"{get_text('enter_quantity_prompt', lang)} (1-{stock}):",
             reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("❌ 取消", callback_data="show_categories")
+                InlineKeyboardButton(get_text('btn_cancel', lang), callback_data="show_categories")
             ]])
         )
     
