@@ -716,16 +716,6 @@ def translate_product_name(product_name, target_lang='zh'):
         '月号': 'Monthly',
         '账号': 'Account',
     }
-
-        '3年以上': '3+ Year',
-        '2年以上': '2+ Year',
-        '1年以上': '1+ Year',
-        
-        # 通用词
-        '老号': 'Old Account',
-        '月号': 'Monthly',
-        '账号': 'Account',
-    }
     
     # 按长度降序排序，避免短字符串先匹配导致长字符串无法匹配
     for zh_desc in sorted(description_map.keys(), key=len, reverse=True):
