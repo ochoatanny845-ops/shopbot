@@ -642,34 +642,59 @@ def translate_product_name(product_name, target_lang='zh'):
     
     # 英文：先替换商品描述（按长度从长到短排序，避免部分匹配）
     description_map = {
-        # 年份描述（长的在前）
+        # 特殊长描述
+        '会员VIP（盲盒低于两天可退换）': 'VIP (Blind Box, Refundable <2 days)',
+        '2-5月联系人受限少量测': '2-5 Month (Limited Contacts)',
+        '11年以上老号（2014年）': '11+ Year Old (2014)',
+        '最少11年以上（2014年）老号': 'Min 11+ Year (2014)',
+        '2014年（11年以上老号）': '2014 (11+ Year)',
         '7年以上适合当主号使用': '7+ Year (Main Account)',
+        '实卡（真机注册）': 'Real SIM (Real Device)',
+        '精品月号40天+': 'Premium Monthly 40+Days',
+        
+        # 年份+老号组合
+        '10年以上老号': '10+ Year Old',
+        '11年以上老号': '11+ Year Old',
+        '9年以上老号': '9+ Year Old',
+        '8年以上老号': '8+ Year Old',
+        '7年以上老号': '7+ Year Old',
+        '6年以上老号': '6+ Year Old',
         '5年以上老号': '5+ Year Old',
-        '3年-4年老号': '3-4 Year Old',
         '3-4年以上': '3-4 Year Old',
+        '3年-4年老号': '3-4 Year Old',
         '3-4年老号': '3-4 Year Old',
         '1年-2年老号': '1-2 Year Old',
         '1-2年老号': '1-2 Year Old',
         
         # 月份描述
+        '6-12月': '6-12 Month',
         '6月-12月': '6-12 Month',
+        '6-12个月': '6-12 Month',
+        '2-5月': '2-5 Month',
         '2月-5月': '2-5 Month',
+        '2-5个月': '2-5 Month',
         
         # 特殊标签
         '会员号~VIP': 'VIP Membership',
         '靓号5A~~9A': 'Premium 5A-9A',
-        '实卡（真机注册）': 'Real SIM Card (Real Device)',
-        '实卡注册': 'Real SIM Registration',
+        '实卡1年以上': 'Real SIM 1+ Year',
+        '实卡注册': 'Real SIM',
         '真机注册': 'Real Device',
         '精养月号': 'Premium Monthly',
         '精品月号': 'Premium Monthly',
         '全新一手': 'Brand New',
-        '30天以上': '30+ Days',
-        '40天以上': '40+ Days',
-        '45天以上': '45+ Days',
         '满月': 'Full Month',
         
-        # 单独年份（1-10年）
+        # 天数
+        '45天以上': '45+ Days',
+        '45天+': '45+ Days',
+        '40天以上': '40+ Days',
+        '40天+': '40+ Days',
+        '30天以上': '30+ Days',
+        '30天+': '30+ Days',
+        
+        # 单独年份（1-11年）
+        '11年以上': '11+ Year',
         '10年以上': '10+ Year',
         '9年以上': '9+ Year',
         '8年以上': '8+ Year',
@@ -677,6 +702,21 @@ def translate_product_name(product_name, target_lang='zh'):
         '6年以上': '6+ Year',
         '5年以上': '5+ Year',
         '4年以上': '4+ Year',
+        '3年以上': '3+ Year',
+        '2年以上': '2+ Year',
+        '1年以上': '1+ Year',
+        
+        # 拼写错误版本（数据库中的错误需要兼容）
+        '5以年上老号': '5+ Year Old',
+        '2以年上': '2+ Year',
+        '1以年上': '1+ Year',
+        
+        # 通用词
+        '老号': 'Old',
+        '月号': 'Monthly',
+        '账号': 'Account',
+    }
+
         '3年以上': '3+ Year',
         '2年以上': '2+ Year',
         '1年以上': '1+ Year',
