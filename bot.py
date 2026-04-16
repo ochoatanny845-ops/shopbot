@@ -506,6 +506,7 @@ class SalesBot:
     async def _process_quantity(self, update, state, text):
         """处理购买数量输入"""
         user_id = update.effective_user.id
+        lang = self.get_user_language(user_id) or 'zh'
 
         # 验证数量
         try:
