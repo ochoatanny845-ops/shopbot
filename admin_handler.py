@@ -53,7 +53,7 @@ class AdminHandler:
         await update.message.reply_text(
             text,
             reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode='Markdown'
+            parse_mode='HTML'
         )
     
     async def cmd_cha(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -217,7 +217,7 @@ class AdminHandler:
             await query.edit_message_text(
                 text,
                 reply_markup=InlineKeyboardMarkup(keyboard),
-                parse_mode='Markdown'
+                parse_mode='HTML'
             )
     
     async def _show_users(self, query, context):
@@ -243,8 +243,8 @@ class AdminHandler:
         
         for user_id, username, balance, created_at in users:
             text += (
-                f'**ID**: `{user_id}`\n'
-                f'用户名: @{username or "无"}\n'
+                f'<b>ID</b>: <code>{user_id}</code>\n'
+                f'用户名: {username or "无"}\n'
                 f'余额: ${balance:.2f}\n'
                 f'注册: {created_at[:10]}\n'
                 f'━━━━━━━━━━━━━\n'
@@ -255,7 +255,7 @@ class AdminHandler:
         await query.edit_message_text(
             text,
             reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode='Markdown'
+            parse_mode='HTML'
         )
     
     async def _show_settings(self, query, context):
@@ -276,7 +276,7 @@ class AdminHandler:
         await query.edit_message_text(
             text,
             reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode='Markdown'
+            parse_mode='HTML'
         )
     
     async def _start_broadcast(self, query, context):
@@ -352,7 +352,7 @@ class AdminHandler:
                 reply_markup=InlineKeyboardMarkup([[
                     InlineKeyboardButton("❌ 取消", callback_data='broadcast_back')
                 ]]),
-                parse_mode='Markdown'
+                parse_mode='HTML'
             )
             context.user_data['admin_waiting_for'] = 'broadcast_button'
         
@@ -434,13 +434,13 @@ class AdminHandler:
                     photo=photo,
                     caption=text,
                     reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None,
-                    parse_mode='Markdown'
+                    parse_mode='HTML'
                 )
             else:
                 await query.message.reply_text(
                     text,
                     reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None,
-                    parse_mode='Markdown'
+                    parse_mode='HTML'
                 )
         except Exception as e:
             await query.message.reply_text(f'❌ 预览失败：{e}')
@@ -486,14 +486,14 @@ class AdminHandler:
                         photo=photo,
                         caption=text,
                         reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None,
-                        parse_mode='Markdown'
+                        parse_mode='HTML'
                     )
                 else:
                     await context.bot.send_message(
                         chat_id=user_id,
                         text=text,
                         reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None,
-                        parse_mode='Markdown'
+                        parse_mode='HTML'
                     )
                 success += 1
             except Exception as e:
@@ -554,7 +554,7 @@ class AdminHandler:
         await query.edit_message_text(
             text,
             reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode='Markdown'
+            parse_mode='HTML'
         )
     
     async def _handle_button_management(self, query, context):
@@ -589,7 +589,7 @@ class AdminHandler:
             await query.edit_message_text(
                 text,
                 reply_markup=InlineKeyboardMarkup(keyboard),
-                parse_mode='Markdown'
+                parse_mode='HTML'
             )
         
         elif data.startswith('admin_btn_edit_'):
@@ -623,7 +623,7 @@ class AdminHandler:
             await query.edit_message_text(
                 text,
                 reply_markup=InlineKeyboardMarkup(keyboard),
-                parse_mode='Markdown'
+                parse_mode='HTML'
             )
         
         elif data.startswith('admin_btn_up_') or data.startswith('admin_btn_down_'):
@@ -668,7 +668,7 @@ class AdminHandler:
                 reply_markup=InlineKeyboardMarkup([[
                     InlineKeyboardButton("❌ 取消", callback_data='admin_custom_buttons')
                 ]]),
-                parse_mode='Markdown'
+                parse_mode='HTML'
             )
             context.user_data['admin_waiting_for'] = 'custom_button_message'
         else:  # url
@@ -680,7 +680,7 @@ class AdminHandler:
                 reply_markup=InlineKeyboardMarkup([[
                     InlineKeyboardButton("❌ 取消", callback_data='admin_custom_buttons')
                 ]]),
-                parse_mode='Markdown'
+                parse_mode='HTML'
             )
             context.user_data['admin_waiting_for'] = 'custom_button_url'
     
@@ -730,7 +730,7 @@ class AdminHandler:
                 f'按钮文字：{custom_button_data["text"]}\n'
                 f'类型：💬 消息\n\n'
                 f'**内容预览：**\n{content}',
-                parse_mode='Markdown'
+                parse_mode='HTML'
             )
             
             context.user_data['admin_waiting_for'] = None
@@ -746,7 +746,7 @@ class AdminHandler:
                 await update.message.reply_text(
                     '❌ 链接格式错误！\n\n'
                     '链接必须以 `http://`、`https://` 或 `t.me/` 开头',
-                    parse_mode='Markdown'
+                    parse_mode='HTML'
                 )
                 return True
             
@@ -762,7 +762,7 @@ class AdminHandler:
                 f'按钮文字：{custom_button_data["text"]}\n'
                 f'类型：🔗 链接\n'
                 f'链接：{text}',
-                parse_mode='Markdown'
+                parse_mode='HTML'
             )
             
             context.user_data['admin_waiting_for'] = None
@@ -783,7 +783,7 @@ class AdminHandler:
                 '❌ 格式错误！\n\n'
                 '正确格式：`按钮文字---类型---内容`\n'
                 '或：`按钮文字|类型|内容`',
-                parse_mode='Markdown'
+                parse_mode='HTML'
             )
             return
         
@@ -807,7 +807,7 @@ class AdminHandler:
             f'按钮文字：{btn_text}\n'
             f'类型：{btn_type}\n'
             f'内容预览：\n{btn_content[:100]}{"..." if len(btn_content) > 100 else ""}',
-            parse_mode='Markdown'
+            parse_mode='HTML'
         )
         
         context.user_data['admin_waiting_for'] = None
@@ -890,7 +890,7 @@ class AdminHandler:
                 f'✅ **TRC20 地址已更新**\n\n'
                 f'新地址：`{text}`\n\n'
                 '修改已生效，无需重启',
-                parse_mode='Markdown'
+                parse_mode='HTML'
             )
             
             # 清除状态
@@ -905,7 +905,7 @@ class AdminHandler:
                 f'✅ **主菜单文案已更新**\n\n'
                 f'新文案：\n{text}\n\n'
                 '修改已生效，用户下次 /start 时将看到新文案',
-                parse_mode='Markdown'
+                parse_mode='HTML'
             )
             
             # 清除状态
