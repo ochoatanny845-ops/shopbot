@@ -893,10 +893,13 @@ class AdminHandler:
             # 保存订单通知链接
             self.db.set_setting('order_notification_url', text)
             
+            keyboard = [[InlineKeyboardButton("🔙 返回信息配置", callback_data='admin_info_config')]]
+            
             await update.message.reply_text(
                 f'✅ <b>订单通知链接已更新</b>\n\n'
                 f'新链接：<code>{text}</code>\n\n'
                 '修改已生效',
+                reply_markup=InlineKeyboardMarkup(keyboard),
                 parse_mode='HTML'
             )
             
@@ -908,10 +911,13 @@ class AdminHandler:
             # 保存官方客服链接
             self.db.set_setting('customer_service_url', text)
             
+            keyboard = [[InlineKeyboardButton("🔙 返回信息配置", callback_data='admin_info_config')]]
+            
             await update.message.reply_text(
                 f'✅ <b>官方客服链接已更新</b>\n\n'
                 f'新链接：<code>{text}</code>\n\n'
                 '修改已生效',
+                reply_markup=InlineKeyboardMarkup(keyboard),
                 parse_mode='HTML'
             )
             
