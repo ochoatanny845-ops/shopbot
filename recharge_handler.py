@@ -13,11 +13,27 @@ from database import Database
 from trc20_recharge import TRC20Recharge
 from okpay_handler import OKPayHandler
 from config import Config
+from language import get_text
 
 class RechargeHandler:
     """充值处理器"""
     
     def __init__(self):
+        # 语言支持
+        self._bot_db = None
+    
+    def _get_user_language(self, user_id):
+        """获取用户语言"""
+        if self._bot_db is None:
+            self._bot_db = Database()
+        conn = self._bot_db.get_connection()
+        c = conn.cursor()
+        c.execute('SELECT language FROM users WHERE user_id = ?', (user_id,))
+        result = c.fetchone()
+        conn.close()
+        return result[0] if result and result[0] else 'zh'
+    
+    def __original_init__(self):
         self.db = Database()
         # 动态从数据库读取收款地址
         self.api_key = Config.TRONGRID_API_KEY if hasattr(Config, 'TRONGRID_API_KEY') else None
@@ -30,6 +46,8 @@ class RechargeHandler:
         return self.db.get_setting('trc20_address', 'TV77o3KfH8DkQNNEsvDLNo765ABcqr3MnM')
     
     async def handle_recharge_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        user_id = update.effective_user.id if update.effective_user else update.callback_query.from_user.id
+        lang = self._get_user_language(user_id)
         """处理充值请求 - 选择充值方式"""
         user_id = update.effective_user.id
         

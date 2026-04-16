@@ -8,6 +8,7 @@ from config import Config
 from database import Database
 from recharge_handler import RechargeHandler
 from admin_handler import AdminHandler
+from language import get_text, translate_product_name, translate_category_name
 
 class SalesBot:
     """销售机器人"""
@@ -19,6 +20,23 @@ class SalesBot:
         self.user_states = {}  # 用户状态管理
         self.recharge_handler = RechargeHandler()  # 充值处理器
         self.admin_handler = AdminHandler()  # 管理员处理器
+    
+    def get_user_language(self, user_id):
+        """获取用户语言"""
+        conn = self.db.get_connection()
+        c = conn.cursor()
+        c.execute('SELECT language FROM users WHERE user_id = ?', (user_id,))
+        result = c.fetchone()
+        conn.close()
+        return result[0] if result else None
+    
+    def set_user_language(self, user_id, language):
+        """设置用户语言"""
+        conn = self.db.get_connection()
+        c = conn.cursor()
+        c.execute('UPDATE users SET language = ? WHERE user_id = ?', (language, user_id))
+        conn.commit()
+        conn.close()
     
     def build_app(self):
         """构建应用（不启动）"""
@@ -173,39 +191,16 @@ class SalesBot:
         # 保存用户
         self._save_user(user)
         
-        # 获取余额
-        balance = self._get_balance(user.id)
+        # 检查用户语言
+        user_lang = self.get_user_language(user.id)
         
-        # 从数据库读取欢迎文案和客服链接
-        start_message = self.db.get_setting('start_message', '👋 欢迎使用账号购买系统！\n\n🛍 请选择服务：')
-        customer_service_url = self.db.get_setting('customer_service_url', 'https://t.me/id2uu')
+        if user_lang is None:
+            # 首次使用，显示语言选择
+            await self.show_language_selection(update)
+            return
         
-        # 基础按钮
-        keyboard = [
-            [InlineKeyboardButton("📱 Telegram账号购买", callback_data="show_product_overview")],
-            [
-                InlineKeyboardButton("💰 充值余额", callback_data="recharge"),
-                InlineKeyboardButton("📋 我的订单", callback_data="orders")
-            ],
-            [InlineKeyboardButton("👨‍💼 联系客服", url=customer_service_url)]
-        ]
-        
-        # 加载自定义按钮
-        custom_buttons = self.db.get_custom_buttons()
-        for btn in custom_buttons:
-            if btn['type'] == 'url':
-                keyboard.append([InlineKeyboardButton(btn['text'], url=btn['content'])])
-            else:  # message
-                keyboard.append([InlineKeyboardButton(btn['text'], callback_data=f"custom_btn_{btn['id']}")])
-        
-        await update.message.reply_text(
-            f"{start_message}\n\n"
-            f"📱 用户ID：`{user.id}`\n"
-            f"💰 当前余额：**${balance:.2f} USDT**",
-            reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode='Markdown'
-        )
-    
+        # 已选择语言，显示主菜单
+        await self.show_main_menu(update, user.id, user_lang)
     async def cmd_recharge(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """处理 /recharge 充值命令"""
         await self.recharge_handler.handle_recharge_start(update, context)
@@ -216,6 +211,28 @@ class SalesBot:
         await query.answer()
         
         data = query.data
+        user_id = query.from_user.id
+        
+        # 语言选择回调
+        if data.startswith('lang_'):
+            lang = data.split('_')[1]
+            self.set_user_language(user_id, lang)
+            await self.show_main_menu(query, user_id, lang)
+            return
+        
+        # 切换语言回调
+        if data == 'change_language':
+            user_lang = self.get_user_language(user_id) or 'zh'
+            keyboard = [
+                [InlineKeyboardButton('🇺🇸 English', callback_data='lang_en')],
+                [InlineKeyboardButton('🇨🇳 中文简体', callback_data='lang_zh')],
+                [InlineKeyboardButton(get_text('btn_back', user_lang), callback_data='back_main')]
+            ]
+            await query.edit_message_text(
+                get_text('select_language', user_lang),
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+            return
         
         # 管理员回调
         if data.startswith('admin_'):
@@ -269,6 +286,8 @@ class SalesBot:
             await self._back_to_main(query)
     
     async def _show_product_overview(self, query):
+        user_id = query.from_user.id
+        lang = self.get_user_language(user_id) or 'zh'
         """显示商品总览（中间层）"""
         # 统计总库存
         conn = self.db.get_connection()
@@ -286,7 +305,7 @@ class SalesBot:
         
         keyboard = [
             [InlineKeyboardButton(
-                f"TG💎直登+协议+api 百万库存 ({total_stock}个)",
+                f"TG💎直登+协议+api {get_text('available_quantity', lang)} ({total_stock})",
                 callback_data="show_categories"
             )],
             [InlineKeyboardButton("🏠 返回主菜单", callback_data="back_main")]
@@ -300,6 +319,8 @@ class SalesBot:
         )
     
     async def _show_categories(self, query):
+        user_id = query.from_user.id
+        lang = self.get_user_language(user_id) or 'zh'
         """显示分类列表"""
         conn = self.db.get_connection()
         c = conn.cursor()
@@ -340,6 +361,8 @@ class SalesBot:
         )
     
     async def _show_products(self, query, category):
+        user_id = query.from_user.id
+        lang = self.get_user_language(user_id) or 'zh'
         """显示商品列表"""
         conn = self.db.get_connection()
         c = conn.cursor()
@@ -384,6 +407,8 @@ class SalesBot:
         )
     
     async def _buy_product(self, query, product_id):
+        user_id = query.from_user.id
+        lang = self.get_user_language(user_id) or 'zh'
         """购买商品 - 提示输入数量"""
         user_id = query.from_user.id
         
@@ -441,6 +466,8 @@ class SalesBot:
         )
     
     async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        user_id = update.effective_user.id
+        lang = self.get_user_language(user_id) or 'zh'
         """处理文本消息（购买数量 / 充值金额 / TxID验证 / 管理员输入）"""
         user_id = update.effective_user.id
         text = update.message.text.strip()
@@ -580,10 +607,10 @@ class SalesBot:
             
             # 发送购买成功消息
             caption = (
-                f"🗂 购买商品: {state['product_name']}\n"
-                f"💰 商品价格: {state['price']} USDT\n"
-                f"🛍 购买数量: {quantity}\n\n"
-                f"🗂文件打包完成 ♻️存活账号{quantity}\n"
+                f"{get_text('purchase_product', lang)}: {translated_product_name}\n"
+                f"{get_text('product_price', lang)}: {state['price']} USDT\n"
+                f"{get_text('purchase_quantity', lang)}: {quantity}\n\n"
+                f"{get_text('files_packaged', lang)} {quantity}\n"
             )
             
             await update.message.reply_text(caption)
@@ -597,11 +624,11 @@ class SalesBot:
             
             # 发送使用说明
             await update.message.reply_text(
-                "📄 协议号: 适用于软件或脚本\n"
-                "🗂 直登号: 适用于在电脑直接登入\n"
-                "📎 Api链接: 适用于在网页上接收验证码以登录其他设备\n\n"
-                "✅ 所有账号均已删除缓存\n"
-                "⚠️ 请妥善保管好您的文件"
+                f"{get_text('protocol_note', lang)}\n"
+                f"{get_text('direct_login_note', lang)}\n"
+                f"{get_text('api_link_note', lang)}\n\n"
+                f"{get_text('cache_cleared', lang)}\n"
+                f"{get_text('keep_files_safe', lang)}"
             )
             
         except Exception as e:
@@ -628,9 +655,9 @@ class SalesBot:
             conn.close()
             
             await update.message.reply_text(
-                f"❌ 购买失败\n\n"
-                f"错误：{str(e)}\n\n"
-                f"已自动退款 ${total_price:.2f}"
+                f"{get_text('purchase_failed', lang)}\n\n"
+                f"{get_text('error_occurred', lang)}: {str(e)}\n\n"
+                f"{get_text('status_refunded', lang)} ${total_price:.2f}"
             )
     
     async def _show_recharge(self, query):
@@ -695,6 +722,8 @@ class SalesBot:
             await query.answer('❌ 订单不存在或已处理', show_alert=True)
     
     async def _show_orders(self, query):
+        user_id = query.from_user.id
+        lang = self.get_user_language(user_id) or 'zh'
         """显示订单列表"""
         user_id = query.from_user.id
         
@@ -757,39 +786,9 @@ class SalesBot:
     
     async def _back_to_main(self, query):
         """返回主菜单"""
-        user = query.from_user
-        balance = self._get_balance(user.id)
-        
-        # 从数据库读取欢迎文案和客服链接
-        start_message = self.db.get_setting('start_message', '👋 欢迎使用账号购买系统！\n\n🛍 请选择服务：')
-        customer_service_url = self.db.get_setting('customer_service_url', 'https://t.me/id2uu')
-        
-        # 基础按钮
-        keyboard = [
-            [InlineKeyboardButton("📱 Telegram账号购买", callback_data="show_product_overview")],
-            [
-                InlineKeyboardButton("💰 充值余额", callback_data="recharge"),
-                InlineKeyboardButton("📋 我的订单", callback_data="orders")
-            ],
-            [InlineKeyboardButton("👨‍💼 联系客服", url=customer_service_url)]
-        ]
-        
-        # 加载自定义按钮
-        custom_buttons = self.db.get_custom_buttons()
-        for btn in custom_buttons:
-            if btn['type'] == 'url':
-                keyboard.append([InlineKeyboardButton(btn['text'], url=btn['content'])])
-            else:  # message
-                keyboard.append([InlineKeyboardButton(btn['text'], callback_data=f"custom_btn_{btn['id']}")])
-        
-        await query.edit_message_text(
-            f"{start_message}\n\n"
-            f"📱 用户ID：`{user.id}`\n"
-            f"💰 当前余额：**${balance:.2f} USDT**",
-            reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode='Markdown'
-        )
-    
+        user_id = query.from_user.id
+        lang = self.get_user_language(user_id) or 'zh'
+        await self.show_main_menu(query, user_id, lang)
     def _save_user(self, user):
         """保存用户"""
         conn = self.db.get_connection()
@@ -885,3 +884,49 @@ class SalesBot:
         else:
             # URL 类型（不应该走到这里，因为 URL 按钮直接跳转）
             await query.answer('❌ 按钮类型错误', show_alert=True)
+
+    
+    async def show_language_selection(self, update):
+        """显示语言选择菜单"""
+        keyboard = [
+            [InlineKeyboardButton('🇺🇸 English', callback_data='lang_en')],
+            [InlineKeyboardButton('🇨🇳 中文简体', callback_data='lang_zh')]
+        ]
+        
+        await update.message.reply_text(
+            get_text('select_language', 'zh'),
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    
+    async def show_main_menu(self, update_or_query, user_id, lang):
+        """显示主菜单"""
+        balance = self._get_balance(user_id)
+        customer_service_url = self.db.get_setting('customer_service_url', 'https://t.me/id2uu')
+        
+        keyboard = [
+            [InlineKeyboardButton(get_text('btn_products', lang), callback_data='show_product_overview')],
+            [
+                InlineKeyboardButton(get_text('btn_recharge', lang), callback_data='recharge'),
+                InlineKeyboardButton(get_text('btn_orders', lang), callback_data='orders')
+            ],
+            [
+                InlineKeyboardButton(f"{get_text('btn_balance', lang)}: ${balance:.2f}", callback_data='balance'),
+                InlineKeyboardButton(get_text('btn_support', lang), url=customer_service_url)
+            ],
+            [InlineKeyboardButton(get_text('btn_language', lang), callback_data='change_language')]
+        ]
+        
+        # 自定义按钮
+        custom_buttons = self.db.get_custom_buttons()
+        for btn in custom_buttons:
+            if btn['type'] == 'url':
+                keyboard.append([InlineKeyboardButton(btn['text'], url=btn['content'])])
+            else:
+                keyboard.append([InlineKeyboardButton(btn['text'], callback_data=f"custom_btn_{btn['id']}")])
+        
+        text = f"{get_text('main_menu_title', lang)}\n\n📱 {get_text('current_language', lang)}: {'🇨🇳 中文简体' if lang == 'zh' else '🇺🇸 English'}"
+        
+        if hasattr(update_or_query, 'edit_message_text'):
+            await update_or_query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+        else:
+            await update_or_query.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
