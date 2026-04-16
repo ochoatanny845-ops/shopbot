@@ -42,12 +42,12 @@ class AdminHandler:
         ]
         
         text = (
-            '🔐 **管理员后台**\n\n'
-            '📊 **平台统计**\n'
-            f'👥 用户总数：`{stats["total_users"]}`\n'
-            f'💰 平台余额：`${stats["total_balance"]:.2f}`\n'
-            f'📈 今日收入：`${stats["today_income"]:.2f}`\n'
-            f'📈 昨日收入：`${stats["yesterday_income"]:.2f}`'
+            '<b>🔐 管理员后台</b>\n\n'
+            '<b>📊 平台统计</b>\n'
+            f'👥 用户总数: <code>{stats["total_users"]}</code>\n'
+            f'💰 平台余额: <code>${stats["total_balance"]:.2f}</code>\n'
+            f'📈 今日收入: <code>${stats["today_income"]:.2f}</code>\n'
+            f'📈 昨日收入: <code>${stats["yesterday_income"]:.2f}</code>'
         )
         
         await update.message.reply_text(
@@ -206,12 +206,12 @@ class AdminHandler:
             ]
             
             text = (
-                '🔐 **管理员后台**\n\n'
-                '📊 **平台统计**\n'
-                f'👥 用户总数：`{stats["total_users"]}`\n'
-                f'💰 平台余额：`${stats["total_balance"]:.2f}`\n'
-                f'📈 今日收入：`${stats["today_income"]:.2f}`\n'
-                f'📈 昨日收入：`${stats["yesterday_income"]:.2f}`'
+                '<b>🔐 管理员后台</b>\n\n'
+                '<b>📊 平台统计</b>\n'
+                f'👥 用户总数: <code>{stats["total_users"]}</code>\n'
+                f'💰 平台余额: <code>${stats["total_balance"]:.2f}</code>\n'
+                f'📈 今日收入: <code>${stats["today_income"]:.2f}</code>\n'
+                f'📈 昨日收入: <code>${stats["yesterday_income"]:.2f}</code>'
             )
             
             await query.edit_message_text(

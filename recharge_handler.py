@@ -19,6 +19,8 @@ class RechargeHandler:
     """充值处理器"""
     
     def __init__(self):
+        # 数据库
+        self.db = Database()
         # 语言支持
         self._bot_db = None
     
