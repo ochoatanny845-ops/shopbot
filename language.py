@@ -118,6 +118,10 @@ LANG = {
         'recharged_amount': '💰 充值金额',
         'thank_you': '🎉 感谢使用!祝您购物愉快 🛍️',
         'invalid_verification_code': '❌ 验证码格式错误,请输入6位"数字"码',
+        'tx_hash_used': '❌ 该交易哈希已被使用',
+        'verifying_transaction': '🔍 正在验证交易，请稍候...',
+        'order_not_found': '❌ 订单不存在',
+        'checking_order_status': '🔍 正在查询订单状态...',
         
         # ===== 余额 Balance =====
         'balance_title': '💳 余额',
@@ -144,6 +148,8 @@ LANG = {
         # ===== 错误提示 Error Messages =====
         'enter_between': '请输入',
         'invalid_number': '❌ 请输入有效的数字',
+        'minimum_recharge_error': '❌ 最低充值金额为 1 USDT',
+        'no_pending_order': '❌ 未找到待充值的订单，请先点击"充值"按钮',
         'insufficient_balance': '❌ 余额不足，请先充值',
         'out_of_stock_error': '❌ 库存不足，无法购买',
         'purchase_failed': '❌ 购买失败',
@@ -281,6 +287,10 @@ LANG = {
         'recharged_amount': '💰 Recharged Amount',
         'thank_you': '🎉 Thank you! Happy shopping 🛍️',
         'invalid_verification_code': '❌ Invalid verification code, please enter 6-digit code',
+        'tx_hash_used': '❌ This transaction hash has been used',
+        'verifying_transaction': '🔍 Verifying transaction, please wait...',
+        'order_not_found': '❌ Order not found',
+        'checking_order_status': '🔍 Checking order status...',
         
         # ===== Balance =====
         'balance_title': '💳 Balance',
@@ -307,6 +317,8 @@ LANG = {
         # ===== Error Messages =====
         'enter_between': 'Please enter',
         'invalid_number': '❌ Please enter a valid number',
+        'minimum_recharge_error': '❌ Minimum recharge amount is 1 USDT',
+        'no_pending_order': '❌ No pending order found, please click "Recharge" button first',
         'insufficient_balance': '❌ Insufficient balance, please recharge first',
         'out_of_stock_error': '❌ Out of stock, cannot purchase',
         'purchase_failed': '❌ Purchase failed',

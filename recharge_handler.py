@@ -55,13 +55,13 @@ class RechargeHandler:
         keyboard = []
         
         # TRC20 充值（始终可用）
-        keyboard.append([InlineKeyboardButton("💎 USDT TRC20 充值", callback_data='recharge_method_trc20')])
+        keyboard.append([InlineKeyboardButton(get_text('trc20_recharge', lang), callback_data='recharge_method_trc20')])
         
         # OKPay 充值（如果已配置）
         if self.okpay:
-            keyboard.append([InlineKeyboardButton("⚡ OKPay 快速充值", callback_data='recharge_method_okpay')])
+            keyboard.append([InlineKeyboardButton(get_text('okpay_recharge', lang), callback_data='recharge_method_okpay')])
         
-        keyboard.append([InlineKeyboardButton("🔙 返回", callback_data='main_menu')])
+        keyboard.append([InlineKeyboardButton(get_text('btn_back', lang), callback_data='main_menu')])
         
         reply_markup = InlineKeyboardMarkup(keyboard)
         
@@ -132,7 +132,7 @@ class RechargeHandler:
             amount = float(update.message.text.strip())
             
             if amount < 1:
-                await update.message.reply_text('❌ 最低充值金额为 1 USDT')
+                await update.message.reply_text(get_text('minimum_recharge_error', lang))
                 return
             
             # 获取充值方式
@@ -146,7 +146,7 @@ class RechargeHandler:
                 await self._handle_trc20_recharge(update, context, amount)
             
         except ValueError:
-            await update.message.reply_text('❌ 请输入有效的数字，例如：10')
+            await update.message.reply_text(get_text('invalid_amount', lang))
     
     async def _handle_trc20_recharge(self, update: Update, context: ContextTypes.DEFAULT_TYPE, amount: float):
         """处理 TRC20 充值"""
@@ -360,7 +360,7 @@ class RechargeHandler:
         order = c.fetchone()
         
         if not order:
-            await update.message.reply_text('❌ 未找到待充值的订单，请先点击"充值"按钮')
+            await update.message.reply_text(get_text('no_pending_order', lang))
             conn.close()
             return
         
@@ -396,7 +396,7 @@ class RechargeHandler:
         # 检查 TxID 是否已被使用
         c.execute('SELECT id FROM recharge_orders WHERE txid = ?', (txid,))
         if c.fetchone():
-            await update.message.reply_text('❌ 该交易哈希已被使用')
+            await update.message.reply_text(get_text('tx_hash_used', lang))
             conn.close()
             return
         
@@ -601,7 +601,7 @@ class RechargeHandler:
         conn.close()
         
         if not order:
-            await query.edit_message_text('❌ 订单不存在')
+            await query.edit_message_text(get_text('order_not_found', lang))
             return
         
         unique_id, amount, status = order

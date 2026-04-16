@@ -307,7 +307,7 @@ class SalesBot:
                 f"TG💎直登+协议+api {get_text('available_quantity', lang)} ({total_stock})" if lang == 'en' else f"TG💎直登+协议+api 百万库存 ({total_stock}个)",
                 callback_data="show_categories"
             )],
-            [InlineKeyboardButton("🏠 返回主菜单", callback_data="back_main")]
+            [InlineKeyboardButton(get_text('btn_back', lang), callback_data="back_main")]
         ]
         
         await query.edit_message_text(
@@ -339,7 +339,7 @@ class SalesBot:
             await query.edit_message_text(
                 "⚠️ 暂无商品\n\n请稍后再试！",
                 reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("🏠 返回主菜单", callback_data="back_main")
+                    InlineKeyboardButton(get_text('btn_back', lang), callback_data="back_main")
                 ]])
             )
             return
@@ -380,7 +380,7 @@ class SalesBot:
             await query.edit_message_text(
                 f"⚠️ 分类 {category} 暂无商品",
                 reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("⬅️ 返回分类", callback_data="show_categories"),
+                    InlineKeyboardButton(get_text('btn_back_category', lang), callback_data="show_categories"),
                     InlineKeyboardButton(get_text('btn_main_menu', lang), callback_data="back_main")
                 ]])
             )
@@ -394,7 +394,7 @@ class SalesBot:
             )])
         
         keyboard.append([
-            InlineKeyboardButton("⬅️ 返回分类", callback_data="show_categories"),
+            InlineKeyboardButton(get_text('btn_back_category', lang), callback_data="show_categories"),
             InlineKeyboardButton(get_text('btn_main_menu', lang), callback_data="back_main")
         ])
         
@@ -426,7 +426,7 @@ class SalesBot:
             await query.edit_message_text(
                 "❌ 商品不存在或已下架",
                 reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("⬅️ 返回分类", callback_data="show_categories")
+                    InlineKeyboardButton(get_text('btn_back_category', lang), callback_data="show_categories")
                 ]])
             )
             return
@@ -437,7 +437,7 @@ class SalesBot:
             await query.edit_message_text(
                 f"❌ 商品 {name} 已售罄",
                 reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("⬅️ 返回分类", callback_data="show_categories")
+                    InlineKeyboardButton(get_text('btn_back_category', lang), callback_data="show_categories")
                 ]])
             )
             return
@@ -657,6 +657,8 @@ class SalesBot:
             )
     
     async def _show_recharge(self, query):
+        user_id = query.from_user.id
+        lang = self.get_user_language(user_id) or 'zh'
         """显示充值方式选择"""
         keyboard = []
         
@@ -665,7 +667,7 @@ class SalesBot:
         
         # OKPay 充值（如果已配置）
         if hasattr(Config, 'OKPAY_SHOP_ID') and Config.OKPAY_SHOP_ID:
-            keyboard.append([InlineKeyboardButton("⚡ OKPay 快速充值", callback_data='recharge_method_okpay')])
+            keyboard.append([InlineKeyboardButton(get_text('okpay_recharge', lang), callback_data='recharge_method_okpay')])
         
         keyboard.append([InlineKeyboardButton("🏠 返回主菜单", callback_data='back_main')])
         
@@ -711,7 +713,7 @@ class SalesBot:
             await query.edit_message_text(
                 f'✅ 已取消充值订单 #{order_id}',
                 reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("🏠 返回主菜单", callback_data='back_main')
+                    InlineKeyboardButton(get_text('btn_back', lang), callback_data='back_main')
                 ]])
             )
         else:
@@ -740,7 +742,7 @@ class SalesBot:
             await query.edit_message_text(
                 "📋 暂无订单",
                 reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("🏠 返回主菜单", callback_data="back_main")
+                    InlineKeyboardButton(get_text('btn_back', lang), callback_data="back_main")
                 ]])
             )
             return
@@ -760,7 +762,7 @@ class SalesBot:
         await query.edit_message_text(
             text,
             reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("🏠 返回主菜单", callback_data="back_main")
+                InlineKeyboardButton(get_text('btn_back', lang), callback_data="back_main")
             ]])
         )
     
@@ -775,7 +777,7 @@ class SalesBot:
             "5. 接收账号文件\n\n"
             "如有问题，请联系管理员。",
             reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("🏠 返回主菜单", callback_data="back_main")
+                InlineKeyboardButton(get_text('btn_back', lang), callback_data="back_main")
             ]])
         )
     
@@ -872,7 +874,7 @@ class SalesBot:
             await query.edit_message_text(
                 content,
                 reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("🏠 返回主菜单", callback_data='back_main')
+                    InlineKeyboardButton(get_text('btn_back', lang), callback_data='back_main')
                 ]]),
                 parse_mode='Markdown'
             )
