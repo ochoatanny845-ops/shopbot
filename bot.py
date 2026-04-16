@@ -1019,19 +1019,24 @@ class SalesBot:
         # 语言切换按钮放在最底部
         keyboard.append([InlineKeyboardButton(get_text('btn_language', lang), callback_data='change_language')])
 
-        # 新格式：欢迎词 + 用户统计 + 链接（使用Markdown链接格式）
+        # 新格式：欢迎词 + 用户统计 + 链接（使用HTML格式避免Markdown解析问题）
+        # 转义HTML特殊字符
+        safe_start_message = start_message.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+        safe_notification_url = order_notification_url.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+        safe_customer_url = customer_service_url.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+        
         text = (
-            f"{start_message}\n\n"
-            f"{get_text('user_stats_id', lang)} `{user_id}`\n\n"
-            f"{get_text('user_stats_balance', lang)} `${balance:.2f}`\n"
-            f"{get_text('user_stats_spent', lang)} `${total_spent:.2f}`\n"
-            f"{get_text('user_stats_orders', lang)} `{total_orders}`\n"
+            f"{safe_start_message}\n\n"
+            f"{get_text('user_stats_id', lang)} <code>{user_id}</code>\n\n"
+            f"{get_text('user_stats_balance', lang)} <code>${balance:.2f}</code>\n"
+            f"{get_text('user_stats_spent', lang)} <code>${total_spent:.2f}</code>\n"
+            f"{get_text('user_stats_orders', lang)} <code>{total_orders}</code>\n"
             f"-------------------------------\n"
-            f"{get_text('order_notification', lang)} {order_notification_url}\n"
-            f"{get_text('customer_service', lang)} {customer_service_url}"
+            f"{get_text('order_notification', lang)} {safe_notification_url}\n"
+            f"{get_text('customer_service', lang)} {safe_customer_url}"
         )
 
         if hasattr(update_or_query, 'edit_message_text'):
-            await update_or_query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
+            await update_or_query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
         else:
-            await update_or_query.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
+            await update_or_query.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
