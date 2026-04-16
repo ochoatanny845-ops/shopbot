@@ -604,6 +604,10 @@ class SalesBot:
             except:
                 pass  # 如果删除失败,忽略错误
 
+            # 翻译商品名
+            from language import translate_product_name
+            translated_product_name = translate_product_name(state['product_name'], lang)
+
             # 发送购买成功消息
             caption = (
                 f"{get_text('purchase_product', lang)}: {translated_product_name}\n"
