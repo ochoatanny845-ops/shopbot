@@ -288,7 +288,6 @@ class SalesBot:
     async def _show_product_overview(self, query):
         user_id = query.from_user.id
         lang = self.get_user_language(user_id) or 'zh'
-        """显示商品总览（中间层）"""
         # 统计总库存
         conn = self.db.get_connection()
         c = conn.cursor()
@@ -321,7 +320,6 @@ class SalesBot:
     async def _show_categories(self, query):
         user_id = query.from_user.id
         lang = self.get_user_language(user_id) or 'zh'
-        """显示分类列表"""
         conn = self.db.get_connection()
         c = conn.cursor()
         
@@ -348,22 +346,22 @@ class SalesBot:
         
         keyboard = []
         for cat, stock in categories:
+            translated_cat = translate_category_name(cat, lang)
             keyboard.append([InlineKeyboardButton(
-                f"{cat} 【{stock}】",
+                f"{translated_cat} 【{stock}】",
                 callback_data=f"cat_{cat}"
             )])
         
-        keyboard.append([InlineKeyboardButton("⬅️ 返回上级", callback_data="show_product_overview")])
+        keyboard.append([InlineKeyboardButton(get_text('btn_back', lang), callback_data="show_product_overview")])
         
         await query.edit_message_text(
-            "📱 请选择分类：",
+            get_text('select_category', lang),
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
     
     async def _show_products(self, query, category):
         user_id = query.from_user.id
         lang = self.get_user_language(user_id) or 'zh'
-        """显示商品列表"""
         conn = self.db.get_connection()
         c = conn.cursor()
         
@@ -409,7 +407,6 @@ class SalesBot:
     async def _buy_product(self, query, product_id):
         user_id = query.from_user.id
         lang = self.get_user_language(user_id) or 'zh'
-        """购买商品 - 提示输入数量"""
         user_id = query.from_user.id
         
         # 查询商品
@@ -468,7 +465,6 @@ class SalesBot:
     async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = update.effective_user.id
         lang = self.get_user_language(user_id) or 'zh'
-        """处理文本消息（购买数量 / 充值金额 / TxID验证 / 管理员输入）"""
         user_id = update.effective_user.id
         text = update.message.text.strip()
         
@@ -724,7 +720,6 @@ class SalesBot:
     async def _show_orders(self, query):
         user_id = query.from_user.id
         lang = self.get_user_language(user_id) or 'zh'
-        """显示订单列表"""
         user_id = query.from_user.id
         
         conn = self.db.get_connection()
