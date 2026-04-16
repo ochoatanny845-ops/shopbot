@@ -620,9 +620,12 @@ class SalesBot:
 
             # 发送 3 个文件
             for file_info in files:
+                # 翻译文件名
+                translated_filename = translate_product_name(file_info['name'], lang)
+                
                 await update.message.reply_document(
                     document=open(file_info['path'], 'rb'),
-                    filename=file_info['name']
+                    filename=translated_filename
                 )
 
             # 发送使用说明
