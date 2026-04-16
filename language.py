@@ -650,10 +650,25 @@ def translate_product_name(product_name, target_lang='zh'):
         '3-4年老号': '3-4 Year Old',
         '1年-2年老号': '1-2 Year Old',
         '1-2年老号': '1-2 Year Old',
+        
+        # 月份描述
         '6月-12月': '6-12 Month',
         '2月-5月': '2-5 Month',
+        
+        # 特殊标签
         '会员号~VIP': 'VIP Membership',
         '靓号5A~~9A': 'Premium 5A-9A',
+        '实卡（真机注册）': 'Real SIM Card (Real Device)',
+        '实卡注册': 'Real SIM Registration',
+        '真机注册': 'Real Device',
+        '精养月号': 'Premium Monthly',
+        '精品月号': 'Premium Monthly',
+        '全新一手': 'Brand New',
+        '30天以上': '30+ Days',
+        '40天以上': '40+ Days',
+        '45天以上': '45+ Days',
+        '满月': 'Full Month',
+        
         # 单独年份（1-10年）
         '10年以上': '10+ Year',
         '9年以上': '9+ Year',
@@ -665,7 +680,10 @@ def translate_product_name(product_name, target_lang='zh'):
         '3年以上': '3+ Year',
         '2年以上': '2+ Year',
         '1年以上': '1+ Year',
+        
+        # 通用词
         '老号': 'Old Account',
+        '月号': 'Monthly',
         '账号': 'Account',
     }
     
