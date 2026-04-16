@@ -388,8 +388,10 @@ class SalesBot:
 
         keyboard = []
         for pid, name, price, stock in products:
+            # 翻译商品名
+            translated_name = translate_product_name(name, lang)
             keyboard.append([InlineKeyboardButton(
-                f"{name} 【{stock}】- ${price}",
+                f"{translated_name} [{stock}] - ${price}",
                 callback_data=f"buy_{pid}"
             )])
 
@@ -399,8 +401,8 @@ class SalesBot:
         ])
 
         await query.edit_message_text(
-            f"📱 {category} 商品列表:\n\n"
-            f"共 {len(products)} 个商品",
+            f"{translate_category_name(category, lang)} {get_text('product_list_title', lang)}\n\n"
+            f"{get_text('total_products', lang)}: {len(products)} {get_text('pieces', lang)}",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
 
