@@ -128,16 +128,6 @@ class RechargeHandler:
         
         # 保存"请输入充值金额"消息 ID
         context.user_data['amount_prompt_message_id'] = amount_prompt.message_id
-        # 发送提示并保存消息 ID
-        amount_prompt = await query.edit_message_text(
-            '💰 **请输入充值金额**\n\n'
-            '⚠️ 最低充值：1 USDT\n'
-            '⚠️ 请输入数字，例如：10',
-            parse_mode='Markdown'
-        )
-        
-        # 保存"请输入充值金额"消息 ID
-        context.user_data['amount_prompt_message_id'] = amount_prompt.message_id
     
     async def handle_amount_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """处理用户输入的金额"""
