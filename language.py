@@ -638,19 +638,13 @@ def translate_product_name(product_name, target_lang='zh'):
     if target_lang == 'zh':
         return product_name  # 中文保持原样 Keep Chinese as is
     
-    # 英文：替换国家名
     result = product_name
-    for zh_name, en_name in COUNTRY_NAMES['zh_to_en'].items():
-        if zh_name in result:
-            result = result.replace(zh_name, en_name)
-            break  # 只替换第一个匹配
     
-    # 英文：替换商品描述
+    # 英文：先替换商品描述（按长度从长到短排序，避免部分匹配）
     description_map = {
-        # 年份描述（按优先级排序，长的在前）
+        # 年份描述（长的在前）
         '7年以上适合当主号使用': '7+ Year (Main Account)',
         '5年以上老号': '5+ Year Old',
-        '5年以上': '5+ Year Old',
         '3年-4年老号': '3-4 Year Old',
         '3-4年以上': '3-4 Year Old',
         '3-4年老号': '3-4 Year Old',
@@ -660,15 +654,23 @@ def translate_product_name(product_name, target_lang='zh'):
         '2月-5月': '2-5 Month',
         '会员号~VIP': 'VIP Membership',
         '靓号5A~~9A': 'Premium 5A-9A',
+        '5年以上': '5+ Year',
+        '6年以上': '6+ Year',
         '老号': 'Old Account',
         '账号': 'Account',
-        '共和国': 'Republic',
-        '以上': '+',
     }
     
-    for zh_desc, en_desc in description_map.items():
+    # 按长度降序排序，避免短字符串先匹配导致长字符串无法匹配
+    for zh_desc in sorted(description_map.keys(), key=len, reverse=True):
         if zh_desc in result:
-            result = result.replace(zh_desc, en_desc)
+            result = result.replace(zh_desc, description_map[zh_desc])
+    
+    # 英文：再替换国家名（按长度从长到短排序）
+    # 对国家名也按长度排序，优先匹配长名称（如"巴布亚新几内亚"优先于"几内亚"）
+    sorted_countries = sorted(COUNTRY_NAMES['zh_to_en'].items(), key=lambda x: len(x[0]), reverse=True)
+    for zh_name, en_name in sorted_countries:
+        if zh_name in result:
+            result = result.replace(zh_name, en_name)
     
     return result
 
