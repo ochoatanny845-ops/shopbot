@@ -268,7 +268,9 @@ class SalesBot:
             await self._handle_custom_button(query)
             return
 
-        if data == "show_categories":
+        if data == "show_product_overview":
+            await self._show_product_overview(query)
+        elif data == "show_categories":
             await self._show_categories(query)
         elif data.startswith("cat_"):
             category = data[4:]
@@ -1019,10 +1021,15 @@ class SalesBot:
             start_message = self.db.get_setting('start_message_en', get_text('welcome_message', 'en'))
 
         # 原版布局:4个按钮 + 自定义按钮(语言切换移到最底部)
+        # Get total stock count
+        conn = self.db.get_connection()
+        c = conn.cursor()
+        c.execute('SELECT SUM(stock) FROM products WHERE is_active = 1')
+        total_stock = c.fetchone()[0] or 0
+        conn.close()
+        
         keyboard = [
-            [InlineKeyboardButton('TG Tdada|session|api', callback_data='cat_tdata+session+api')],
-            [InlineKeyboardButton('TG session only', callback_data='cat_session')],
-            [InlineKeyboardButton('TG Tdada only', callback_data='cat_tdata')],
+            [InlineKeyboardButton(f'TG✈️ Tdada｜session｜api ({total_stock})', callback_data='show_product_overview')],
             [
                 InlineKeyboardButton(get_text('btn_recharge', lang), callback_data='recharge'),
                 InlineKeyboardButton(get_text('btn_orders', lang), callback_data='orders')
