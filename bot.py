@@ -591,9 +591,20 @@ class SalesBot:
             f"{get_text('quantity_label', lang)} {quantity}\n"
             f"{get_text('total_price_label', lang)} ${total_price:.2f}\n"
             f"{get_text('order_number_label', lang)} {order_id}\n\n"
-            f"{get_text('checking_accounts', lang)}"
+            "正在打包账号检查中...\n请稍候，最多2分钟"
         )
 
+        # 检查是否有人正在购买（排队提示）
+        if self.purchaser._purchase_lock.locked():
+            queue_msg = (
+                "⏳ 订单已收到！\n\n"
+                "前方有订单正在处理中\n"
+                "您的订单排在队列中\n\n"
+                "预计等待时间：30-90秒\n"
+                "请耐心等待..."
+            )
+            await update.message.reply_text(queue_msg)
+        
         # 调用代购模块(传递 user_id 和 order_id 用于隔离)
         try:
             result = await self.purchaser.purchase(

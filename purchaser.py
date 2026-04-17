@@ -40,8 +40,14 @@ class AutoPurchaser:
             list: 文件列表 [{'path': ..., 'name': ...}, ...]
         """
         # 🔒 全局锁：同一时间只处理一个订单
+        # Check if someone is purchasing (queue notification)
+        if AutoPurchaser._purchase_lock.locked():
+            print(f"[QUEUE] Order #{order_id} is waiting (another order in progress)")
+            # Note: In a full implementation, send Telegram message to user here
+            # For now, just log it
+        
         async with AutoPurchaser._purchase_lock:
-            print(f'🔒 订单 #{order_id} (用户 {user_id}) 开始处理...')
+            print(f'[LOCK] Order #{order_id} (User {user_id}) processing...')
             
             # 查询商品信息
             conn = self.db.get_connection()
