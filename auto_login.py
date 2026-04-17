@@ -2,6 +2,7 @@
 自动登录模块 - 通过API自动获取验证码和2FA
 """
 import asyncio
+import os
 import re
 import json
 import time
@@ -116,6 +117,12 @@ class AutoLoginHelper:
         print(f'\n📱 开始自动登录: {phone}')
         print(f'📡 API: {api_url}')
         
+        # 删除已存在的session文件（避免冲突）
+        if os.path.exists(session_name):
+            os.remove(session_name)
+        if os.path.exists(session_name + '.journal'):
+            os.remove(session_name + '.journal')
+        
         try:
             # 1. 获取API配置
             print(f'  [1/5] 📡 获取API配置...')
@@ -140,12 +147,26 @@ class AutoLoginHelper:
             
             await client.connect()
             
+            # 等待连接稳定
+            if not await client.is_user_authorized():
+                print(f'  ✅ 连接成功，准备发送验证码')
+            
             # 格式化手机号（确保有+号）
             if not phone.startswith('+'):
                 phone = '+' + phone
             
-            # 发送验证码请求
-            await client.send_code_request(phone)
+            # 发送验证码请求（添加重试机制）
+            max_retries = 3
+            for retry in range(max_retries):
+                try:
+                    await client.send_code_request(phone)
+                    break
+                except Exception as e:
+                    if retry < max_retries - 1:
+                        print(f'  ⚠️ 发送验证码失败（重试 {retry + 1}/{max_retries}）: {e}')
+                        await asyncio.sleep(2)
+                    else:
+                        raise
             
             # 4. 监听SSE获取验证码
             print(f'  [4/5] ⏳ 等待验证码 (最多60秒)...')
@@ -169,7 +190,6 @@ class AutoLoginHelper:
             except SessionPasswordNeededError:
                 # 需要2FA
                 if not two_fa:
-                    await client.disconnect()
                     return {'success': False, 'error': '需要2FA但未找到密码'}
                 
                 print(f'  🔑 输入2FA密码...')
@@ -177,11 +197,7 @@ class AutoLoginHelper:
                 print(f'  ✅ 2FA验证成功！')
             
             except PhoneCodeInvalidError:
-                await client.disconnect()
                 return {'success': False, 'error': '验证码无效'}
-            
-            # 断开连接
-            await client.disconnect()
             
             return {
                 'success': True,
@@ -193,3 +209,9 @@ class AutoLoginHelper:
         except Exception as e:
             print(f'  ❌ 登录失败: {e}')
             return {'success': False, 'error': str(e)}
+        
+        finally:
+            # 确保断开连接
+            if 'client' in locals() and client.is_connected():
+                await client.disconnect()
+                print(f'  🔌 连接已关闭')
