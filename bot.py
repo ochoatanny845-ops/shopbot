@@ -364,7 +364,7 @@ class SalesBot:
                 callback_data=f"cat_{cat}"
             )])
 
-        keyboard.append([InlineKeyboardButton(get_text('btn_back', lang), callback_data="show_product_overview")])
+        keyboard.append([InlineKeyboardButton(get_text('btn_back', lang), callback_data="back_main")])
 
         await query.edit_message_text(
             get_text('select_category', lang),
