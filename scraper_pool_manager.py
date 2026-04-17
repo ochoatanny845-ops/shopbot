@@ -140,33 +140,23 @@ class ScraperPoolManager:
         return elapsed
     
     async def send_telegram_alert(self, message):
-        """发送Telegram告警给管理员"""
-        if not hasattr(Config, 'ADMIN_USER_ID') or not Config.ADMIN_USER_ID:
-            print(f'⚠️ 未配置管理员ID，无法发送告警')
-            print(f'💡 请在 config.py 中添加: ADMIN_USER_ID = 你的用户ID')
-            print(f'\n告警内容:\n{message}\n')
-            return
-        
+        """发送Telegram告警给管理员（通过账号管理Bot）"""
         try:
-            # 使用第一个可用账号发送（或创建专门的告警client）
-            account = self.get_next_account()
-            if not account:
-                print(f'❌ 无可用账号发送告警')
-                return
+            # 使用账号管理Bot发送告警
+            from telegram import Bot
             
-            client = TelegramClient(
-                account['session'],
-                Config.API_ID,
-                Config.API_HASH
-            )
-            await client.start()
-            await client.send_message(Config.ADMIN_USER_ID, message)
-            await client.disconnect()
+            # 账号管理Bot Token
+            ALERT_BOT_TOKEN = '8680801765:AAH9C4uERN9-14hq7p4kfN1EX2wg744syEc'
+            ADMIN_ID = 5991190607
+            
+            bot = Bot(token=ALERT_BOT_TOKEN)
+            await bot.send_message(chat_id=ADMIN_ID, text=message)
             
             print(f'✅ 告警已发送给管理员')
             
         except Exception as e:
             print(f'❌ 发送告警失败: {e}')
+            print(f'\n告警内容:\n{message}\n')
     
     async def send_ban_alert(self, account):
         """发送封禁告警"""
