@@ -199,6 +199,14 @@ class AutoLoginHelper:
             except PhoneCodeInvalidError:
                 return {'success': False, 'error': '验证码无效'}
             
+            # 6. 自动初始化（访问@hao24bot）
+            print(f'  [6/6] 🤖 自动初始化账号...')
+            try:
+                await self.init_bot_account(client)
+                print(f'  ✅ 初始化完成！')
+            except Exception as e:
+                print(f'  ⚠️ 初始化失败（不影响登录）: {e}')
+            
             return {
                 'success': True,
                 'phone': phone,
@@ -215,3 +223,43 @@ class AutoLoginHelper:
             if 'client' in locals() and client.is_connected():
                 await client.disconnect()
                 print(f'  🔌 连接已关闭')
+    
+    async def init_bot_account(self, client):
+        """自动初始化账号（访问@hao24bot）"""
+        try:
+            # 1. 发送 /start 给 @hao24bot
+            await client.send_message('hao24bot', '/start')
+            await asyncio.sleep(2)
+            
+            # 2. 获取最新消息（包含语言选择按钮）
+            messages = await client.get_messages('hao24bot', limit=1)
+            
+            if not messages:
+                print(f'    ⚠️ 未收到机器人回复')
+                return
+            
+            last_message = messages[0]
+            
+            # 3. 检查是否有按钮
+            if last_message.buttons:
+                # 查找"简体中文"按钮
+                for row in last_message.buttons:
+                    for button in row:
+                        if '简体中文' in button.text or 'Chinese' in button.text:
+                            # 点击按钮
+                            await button.click()
+                            await asyncio.sleep(1)
+                            print(f'    ✅ 已选择简体中文')
+                            return
+                
+                # 如果没找到简体中文，点击第一个按钮
+                await last_message.buttons[0][0].click()
+                await asyncio.sleep(1)
+                print(f'    ✅ 已点击默认语言')
+            else:
+                print(f'    ⚠️ 消息无按钮，可能已初始化')
+        
+        except Exception as e:
+            print(f'    ❌ 初始化错误: {e}')
+            raise
+
