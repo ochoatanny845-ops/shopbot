@@ -110,7 +110,14 @@ class ScraperPoolManager:
             Config.API_HASH
         )
         
-        await client.start()
+        # 非交互式连接（不要求输入手机号/验证码）
+        await client.connect()
+        
+        # 检查是否已登录
+        if not await client.is_user_authorized():
+            print(f'  ❌ 账号 #{account["id"]} Session失效，请重新登录')
+            await client.disconnect()
+            raise Exception(f'Account {account["id"]} session expired')
         
         # 检查是否被封
         if await self.check_if_banned(client, account):
