@@ -54,7 +54,12 @@ class SalesBot:
 
     def build_app(self):
         """构建应用(不启动)"""
-        self.app = Application.builder().token(Config.BOT_TOKEN).build()
+        self.app = (
+            Application.builder()
+            .token(Config.BOT_TOKEN)
+            .concurrent_updates(True)  # Enable concurrent updates
+            .build()
+        )
 
         # 注册处理器
         self.app.add_handler(CommandHandler("start", self.cmd_start))
