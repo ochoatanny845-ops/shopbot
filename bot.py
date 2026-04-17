@@ -600,6 +600,7 @@ class SalesBot:
         )
 
         # 检查是否有人正在购买（排队提示）
+        queue_message = None
         if self.purchaser._purchase_lock.locked():
             queue_msg = (
                 "⏳ 订单已收到！\n\n"
@@ -608,7 +609,7 @@ class SalesBot:
                 "预计等待时间：30-90秒\n"
                 "请耐心等待..."
             )
-            await update.message.reply_text(queue_msg)
+            queue_message = await update.message.reply_text(queue_msg)
         
         # 调用代购模块(传递 user_id 和 order_id 用于隔离)
         try:
@@ -660,6 +661,13 @@ class SalesBot:
                 await processing_msg.delete()
             except:
                 pass  # 如果删除失败,忽略错误
+            
+            # 删除"排队中..."的消息
+            if queue_message:
+                try:
+                    await queue_message.delete()
+                except:
+                    pass
 
             # 翻译商品名
             from language import translate_product_name
@@ -700,6 +708,13 @@ class SalesBot:
                 await processing_msg.delete()
             except:
                 pass
+            
+            # 删除"排队中..."的消息
+            if queue_message:
+                try:
+                    await queue_message.delete()
+                except:
+                    pass
 
             # ❌ 不再自动退款，只标记订单失败
             conn = self.db.get_connection()
