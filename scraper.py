@@ -59,7 +59,13 @@ class ProductScraper:
             self._save_products(all_products)
             
             print(f'✅ 总共抓取 {len(all_products)} 个商品')
-            return all_products
+            
+            # 返回统计信息
+            return {
+                'total_products': len(all_products),
+                'total_categories': len(categories),
+                'products': all_products
+            }
             
         except Exception as e:
             print(f'❌ 抓取失败: {e}')

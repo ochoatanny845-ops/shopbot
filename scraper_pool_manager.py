@@ -131,8 +131,8 @@ class ScraperPoolManager:
         # 记录开始时间
         start_time = time.time()
         
-        # 抓取商品
-        await scraper.scrape_all()
+        # 抓取商品（返回统计信息）
+        stats = await scraper.scrape_all()
         
         # 记录耗时
         elapsed = time.time() - start_time
@@ -140,7 +140,12 @@ class ScraperPoolManager:
         
         await client.disconnect()
         
-        return elapsed
+        # 返回耗时和统计信息
+        return {
+            'elapsed': elapsed,
+            'total_products': stats.get('total_products', 0),
+            'total_categories': stats.get('total_categories', 0)
+        }
     
     async def send_telegram_alert(self, message):
         """发送Telegram告警给管理员（通过账号管理Bot）"""
@@ -211,26 +216,9 @@ class ScraperPoolManager:
         
         await self.send_telegram_alert(message)
     
-    async def send_stock_update_notification(self, account, elapsed):
+    async def send_stock_update_notification(self, account, elapsed, total_products, total_categories):
         """发送库存更新通知"""
         try:
-            # 从数据库获取商品统计
-            import sqlite3
-            db_path = os.getenv('DATABASE_PATH', 'shopbot.db')
-            
-            conn = sqlite3.connect(db_path)
-            c = conn.cursor()
-            
-            # 查询总商品数
-            c.execute('SELECT COUNT(*) FROM products WHERE is_active = 1')
-            total_products = c.fetchone()[0]
-            
-            # 查询分类数
-            c.execute('SELECT COUNT(DISTINCT category) FROM products WHERE is_active = 1')
-            category_count = c.fetchone()[0]
-            
-            conn.close()
-            
             # 计算下次更新时间
             from datetime import datetime, timedelta
             now = datetime.now()
@@ -240,7 +228,7 @@ class ScraperPoolManager:
                 f"✅ 库存已更新！\n\n"
                 f"🕐 更新时间: {now.strftime('%H:%M:%S')}\n"
                 f"📦 总商品数: {total_products}\n"
-                f"📊 分类数: {category_count}\n"
+                f"📊 分类数: {total_categories}\n"
                 f"⏱️ 耗时: {elapsed:.1f} 秒\n"
                 f"🔄 下次更新: {next_update.strftime('%H:%M:%S')}\n\n"
                 f"使用账号: #{account['id']} ({account['phone']})"
@@ -287,8 +275,13 @@ class ScraperPoolManager:
                 self.low_accounts_notified = False  # 恢复通知标志
             
             try:
-                # 使用该账号抓取
-                elapsed = await self.scrape_with_account(account)
+                # 使用该账号抓取（返回统计信息）
+                result = await self.scrape_with_account(account)
+                
+                # 提取数据
+                elapsed = result['elapsed']
+                total_products = result['total_products']
+                total_categories = result['total_categories']
                 
                 # 标记成功
                 account['status'] = 'active'
@@ -296,7 +289,7 @@ class ScraperPoolManager:
                 account['last_used'] = int(time.time())
                 
                 # 发送库存更新通知
-                await self.send_stock_update_notification(account, elapsed)
+                await self.send_stock_update_notification(account, elapsed, total_products, total_categories)
                 
                 # 自动调整轮换间隔
                 if elapsed > 100 and self.rotation_interval < 120:
