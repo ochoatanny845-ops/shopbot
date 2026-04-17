@@ -1058,7 +1058,7 @@ class SalesBot:
         conn.close()
         
         keyboard = [
-            [InlineKeyboardButton(f'TG✈️ Tdada｜session｜api ({total_stock})', callback_data='show_categories')],
+            [InlineKeyboardButton(f'TG✈️ Tdata｜session｜api ({total_stock})', callback_data='show_categories')],
             [
                 InlineKeyboardButton(get_text('btn_recharge', lang), callback_data='recharge'),
                 InlineKeyboardButton(get_text('btn_orders', lang), callback_data='orders')
