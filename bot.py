@@ -268,9 +268,7 @@ class SalesBot:
             await self._handle_custom_button(query)
             return
 
-        if data == "show_product_overview":
-            await self._show_product_overview(query)
-        elif data == "show_categories":
+        if data == "show_categories":
             await self._show_categories(query)
         elif data.startswith("cat_"):
             category = data[4:]
@@ -1029,7 +1027,7 @@ class SalesBot:
         conn.close()
         
         keyboard = [
-            [InlineKeyboardButton(f'TG✈️ Tdada｜session｜api ({total_stock})', callback_data='show_product_overview')],
+            [InlineKeyboardButton(f'TG✈️ Tdada｜session｜api ({total_stock})', callback_data='show_categories')],
             [
                 InlineKeyboardButton(get_text('btn_recharge', lang), callback_data='recharge'),
                 InlineKeyboardButton(get_text('btn_orders', lang), callback_data='orders')
