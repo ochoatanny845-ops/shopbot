@@ -218,11 +218,13 @@ class AutoPurchaser:
         if msgs and msgs[0].text:
             text = msgs[0].text
             
-            # Match stock patterns
+            # Match stock patterns (with or without space)
             stock_patterns = [
                 r'当前库存[：:]\s*(\d+)',
                 r'库存[：:]\s*(\d+)',
                 r'[Ss]tock[：:]\s*(\d+)',
+                r'当前库存(\d+)',  # No colon or space
+                r'库存(\d+)',
             ]
             
             for pattern in stock_patterns:
