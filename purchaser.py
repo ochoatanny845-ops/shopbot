@@ -293,6 +293,7 @@ class AutoPurchaser:
             
             # 获取最新消息
             msgs = await self.client.get_messages(Config.SOURCE_BOT, limit=10)
+            await asyncio.sleep(0.1)  # Yield after Telethon operation
             
             for msg in msgs:
                 # 🔒 关键隔离：只接收 after_msg_id 之后的消息
@@ -328,7 +329,8 @@ class AutoPurchaser:
                     if len(files) >= 3:
                         break
             
-            await asyncio.sleep(2)
+            # Yield control to event loop (prevent blocking other users)
+            await asyncio.sleep(3)  # Increased from 2 to 3 seconds
         
         return files
     
