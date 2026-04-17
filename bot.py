@@ -662,26 +662,27 @@ class SalesBot:
             except:
                 pass
 
-            # 退款
+            # ❌ 不再自动退款，只标记订单失败
             conn = self.db.get_connection()
             c = conn.cursor()
-            c.execute('UPDATE users SET balance = balance + ? WHERE user_id = ?', (total_price, user_id))
+            # 不再执行: c.execute('UPDATE users SET balance = balance + ? WHERE user_id = ?', ...)
             c.execute('''
                 UPDATE orders
                 SET status = 'failed', error_message = ?
                 WHERE id = ?
             ''', (str(e), order_id))
-            c.execute('''
-                INSERT INTO balance_logs (user_id, amount, type, order_id, note)
-                VALUES (?, ?, 'refund', ?, ?)
-            ''', (user_id, total_price, order_id, f'退款:{str(e)}'))
+            # 不再记录退款日志
+            # c.execute('''INSERT INTO balance_logs ... 'refund' ...''')
             conn.commit()
             conn.close()
 
+            # 提示联系客服，不自动退款
             await update.message.reply_text(
                 f"{get_text('purchase_failed', lang)}\n\n"
                 f"{get_text('error_occurred', lang)}: {str(e)}\n\n"
-                f"{get_text('status_refunded', lang)} ${total_price:.2f}"
+                f"❌ 订单失败，请联系客服处理\n"
+                f"💰 订单金额: ${total_price:.2f}\n"
+                f"📝 订单号: #{order_id}"
             )
 
     async def _show_recharge(self, query):
