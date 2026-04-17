@@ -23,9 +23,9 @@ class RechargeHandler:
         self.db = Database()
         # 获取TRC20收款地址
         recipient_address = self.db.get_setting('trc20_address', 'TV77o3KfH8DkQNNEsvDLNo765ABcqr3MnM')
-        api_key = Config.TRONGRID_API_KEY if hasattr(Config, 'TRONGRID_API_KEY') else None
+        self.api_key = Config.TRONGRID_API_KEY if hasattr(Config, 'TRONGRID_API_KEY') else None
         # 充值处理器
-        self.trc20 = TRC20Recharge(recipient_address, api_key)
+        self.trc20 = TRC20Recharge(recipient_address, self.api_key)
         self.okpay = OKPayHandler()
         # 语言支持
         self._bot_db = None
