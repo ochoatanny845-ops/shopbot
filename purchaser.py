@@ -238,7 +238,12 @@ class AutoPurchaser:
         while len(files) < 3:  # 1 txt + 2 zip = 3个文件
             # 检查超时
             if asyncio.get_event_loop().time() - start_time > timeout:
-                raise Exception('接收文件超时')
+                # ✅ 只要收到文件就返回，不抛异常
+                if len(files) > 0:
+                    print(f'⚠️ 超时但已收到 {len(files)} 个文件，视为成功')
+                    return files
+                else:
+                    raise Exception('接收文件超时（未收到任何文件）')
             
             # 获取最新消息
             msgs = await self.client.get_messages(Config.SOURCE_BOT, limit=10)
