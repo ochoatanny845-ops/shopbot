@@ -144,7 +144,8 @@ class ScraperPoolManager:
         return {
             'elapsed': elapsed,
             'total_products': stats.get('total_products', 0),
-            'total_categories': stats.get('total_categories', 0)
+            'total_categories': stats.get('total_categories', 0),
+            'total_stock': stats.get('total_stock', 0)
         }
     
     async def send_telegram_alert(self, message):
@@ -216,7 +217,7 @@ class ScraperPoolManager:
         
         await self.send_telegram_alert(message)
     
-    async def send_stock_update_notification(self, account, elapsed, total_products, total_categories):
+    async def send_stock_update_notification(self, account, elapsed, total_products, total_categories, total_stock):
         """发送库存更新通知"""
         try:
             # 计算下次更新时间
@@ -229,6 +230,7 @@ class ScraperPoolManager:
                 f"🕐 更新时间: {now.strftime('%H:%M:%S')}\n"
                 f"📦 总商品数: {total_products}\n"
                 f"📊 分类数: {total_categories}\n"
+                f"🏪 总库存: {total_stock:,}\n"
                 f"⏱️ 耗时: {elapsed:.1f} 秒\n"
                 f"🔄 下次更新: {next_update.strftime('%H:%M:%S')}\n\n"
                 f"使用账号: #{account['id']} ({account['phone']})"
@@ -282,6 +284,7 @@ class ScraperPoolManager:
                 elapsed = result['elapsed']
                 total_products = result['total_products']
                 total_categories = result['total_categories']
+                total_stock = result['total_stock']
                 
                 # 标记成功
                 account['status'] = 'active'
@@ -289,7 +292,7 @@ class ScraperPoolManager:
                 account['last_used'] = int(time.time())
                 
                 # 发送库存更新通知
-                await self.send_stock_update_notification(account, elapsed, total_products, total_categories)
+                await self.send_stock_update_notification(account, elapsed, total_products, total_categories, total_stock)
                 
                 # 自动调整轮换间隔
                 if elapsed > 100 and self.rotation_interval < 120:

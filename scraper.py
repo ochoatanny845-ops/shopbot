@@ -58,12 +58,16 @@ class ProductScraper:
             # 保存到数据库
             self._save_products(all_products)
             
+            # 统计总库存
+            total_stock = sum(p.get('stock', 0) for p in all_products)
+            
             print(f'✅ 总共抓取 {len(all_products)} 个商品')
             
             # 返回统计信息
             return {
                 'total_products': len(all_products),
                 'total_categories': len(categories),
+                'total_stock': total_stock,
                 'products': all_products
             }
             
