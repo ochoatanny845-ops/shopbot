@@ -18,6 +18,8 @@ async def init_account(account):
         Config.API_HASH
     )
     
+    success = False
+    
     await client.start()
     
     try:
@@ -67,13 +69,18 @@ async def init_account(account):
         msgs = await client.get_messages(Config.SOURCE_BOT, limit=1)
         if msgs:
             print(f'  ✅ 成功建立对话（主菜单可访问）')
+            success = True
         else:
             print(f'  ⚠️ 未收到回复，但连接成功')
+            success = True  # 假设成功
         
     except Exception as e:
         print(f'  ❌ 初始化失败: {e}')
+        success = False
     
     await client.disconnect()
+    
+    return success
 
 async def main():
     """主函数"""
@@ -102,19 +109,41 @@ async def main():
     print(f'\n📊 找到 {len(accounts)} 个账号')
     print('🔄 开始初始化...\n')
     
+    success_count = 0
+    failed_count = 0
+    
     for account in accounts:
         if account['status'] != 'active':
             print(f'⏭️ 跳过非活跃账号 #{account["id"]}')
             continue
         
-        await init_account(account)
+        success = await init_account(account)
+        
+        if success:
+            success_count += 1
+            account['status'] = 'active'
+        else:
+            failed_count += 1
+            account['status'] = 'failed'
+            print(f'  🔴 账号 #{account["id"]} 已标记为失败状态（刷新器会跳过）')
+    
+    # 保存更新后的状态
+    with open(config_file, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
     
     print('\n' + '='*60)
     print('✅ 初始化完成！')
     print('='*60)
+    print(f'  ✅ 成功: {success_count} 个')
+    print(f'  ❌ 失败: {failed_count} 个（已自动标记为失败状态）')
+    print('='*60)
     print()
-    print('下一步：启动刷新器')
-    print('  python scraper_pool_manager.py')
+    
+    if success_count > 0:
+        print('🚀 可以启动刷新器了！')
+        print('  python scraper_pool_manager.py')
+    else:
+        print('⚠️ 没有可用账号，请先修复失败账号或添加新账号')
     print()
 
 if __name__ == '__main__':
