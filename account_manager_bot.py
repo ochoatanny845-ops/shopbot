@@ -33,6 +33,7 @@ class AccountManagerBot:
         self.app.add_handler(CommandHandler('add', self.cmd_add))
         self.app.add_handler(CommandHandler('apiadd', self.cmd_apiadd))
         self.app.add_handler(CommandHandler('list', self.cmd_list))
+        self.app.add_handler(CommandHandler('del', self.cmd_del))
         self.app.add_handler(CommandHandler('cancel', self.cmd_cancel))
         self.app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message))
         self.app.add_handler(MessageHandler(filters.Document.ALL, self.handle_document))
@@ -51,10 +52,12 @@ class AccountManagerBot:
             '/add - 手动添加账号（需要手动输入验证码）\n'
             '/apiadd - 自动添加账号（通过API自动获取验证码）\n'
             '/list - 查看账号池状态\n'
+            '/del #2 #3 - 删除指定账号（支持批量）\n'
             '/cancel - 取消当前操作\n\n'
             '💡 提示：\n'
             '- /add 适合少量添加\n'
-            '- /apiadd 适合批量添加（支持文本/文件）'
+            '- /apiadd 适合批量添加（支持文本/文件）\n'
+            '- /del 删除失败的账号后可重新添加'
         )
     
     async def cmd_add(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -147,6 +150,89 @@ class AccountManagerBot:
         
         await update.message.reply_text(text)
     
+    async def cmd_del(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """删除账号命令"""
+        user_id = update.effective_user.id
+        
+        if user_id != ADMIN_ID:
+            await update.message.reply_text('❌ 无权限')
+            return
+        
+        # 解析账号ID列表
+        # 格式: /del #2 #3 #5
+        args = context.args
+        
+        if not args:
+            await update.message.reply_text(
+                '❌ 请指定要删除的账号ID\n\n'
+                '格式：/del #2 #3 #5\n'
+                '示例：/del #2\n'
+                '批量：/del #2 #3'
+            )
+            return
+        
+        # 提取账号ID
+        account_ids = []
+        for arg in args:
+            # 去除#号
+            id_str = arg.strip('#')
+            try:
+                account_id = int(id_str)
+                account_ids.append(account_id)
+            except ValueError:
+                await update.message.reply_text(f'❌ 无效的账号ID: {arg}')
+                return
+        
+        if not account_ids:
+            await update.message.reply_text('❌ 未找到有效的账号ID')
+            return
+        
+        # 读取账号池
+        config_file = 'accounts_pool.json'
+        if not os.path.exists(config_file):
+            await update.message.reply_text('❌ 账号池不存在')
+            return
+        
+        with open(config_file, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            accounts = data.get('accounts', [])
+        
+        # 查找要删除的账号
+        to_delete = []
+        not_found = []
+        
+        for account_id in account_ids:
+            found = False
+            for acc in accounts:
+                if acc['id'] == account_id:
+                    to_delete.append(acc)
+                    found = True
+                    break
+            if not found:
+                not_found.append(account_id)
+        
+        if not to_delete:
+            await update.message.reply_text(f'❌ 未找到账号: {", ".join(f"#{id}" for id in not_found)}')
+            return
+        
+        # 确认删除
+        confirm_text = f'⚠️ 确认删除以下账号？\n\n'
+        for acc in to_delete:
+            confirm_text += f'#{acc["id"]} {acc["phone"]} ({acc["status"]})\n'
+        
+        if not_found:
+            confirm_text += f'\n❌ 未找到: {", ".join(f"#{id}" for id in not_found)}\n'
+        
+        confirm_text += '\n回复 yes 确认，其他内容取消'
+        
+        # 保存待删除列表到状态
+        user_states[user_id] = {
+            'step': 'delete_confirm',
+            'accounts_to_delete': to_delete
+        }
+        
+        await update.message.reply_text(confirm_text)
+    
     async def cmd_cancel(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """取消操作"""
         user_id = update.effective_user.id
@@ -185,6 +271,13 @@ class AccountManagerBot:
                 await self.process_apiadd_accounts(update, accounts)
             else:
                 await update.message.reply_text('❌ 已取消')
+                del user_states[user_id]
+        elif step == 'delete_confirm':
+            if text.lower() == 'yes':
+                accounts_to_delete = state.get('accounts_to_delete', [])
+                await self.process_delete_accounts(update, accounts_to_delete)
+            else:
+                await update.message.reply_text('❌ 已取消删除')
                 del user_states[user_id]
     
     async def handle_phone_input(self, update: Update, state, phone):
@@ -530,6 +623,63 @@ class AccountManagerBot:
             f'运行 python init_accounts.py 初始化账号'
         )
         await msg.edit_text(final_text)
+        
+        # 清除状态
+        if user_id in user_states:
+            del user_states[user_id]
+    
+    async def process_delete_accounts(self, update: Update, accounts_to_delete):
+        """处理账号删除"""
+        user_id = update.effective_user.id
+        
+        config_file = 'accounts_pool.json'
+        
+        # 读取配置
+        with open(config_file, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            accounts = data.get('accounts', [])
+        
+        deleted_count = 0
+        deleted_sessions = []
+        
+        # 删除账号
+        for acc_to_del in accounts_to_delete:
+            # 从列表中移除
+            accounts = [acc for acc in accounts if acc['id'] != acc_to_del['id']]
+            
+            # 删除session文件
+            session_file = acc_to_del['session']
+            if os.path.exists(session_file):
+                os.remove(session_file)
+                deleted_sessions.append(session_file)
+            
+            # 删除.journal文件
+            journal_file = session_file + '.journal'
+            if os.path.exists(journal_file):
+                os.remove(journal_file)
+            
+            deleted_count += 1
+        
+        # 保存配置
+        data['accounts'] = accounts
+        with open(config_file, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+        
+        # 报告结果
+        result_text = (
+            f'✅ 删除完成！\n\n'
+            f'已删除 {deleted_count} 个账号:\n'
+        )
+        
+        for acc in accounts_to_delete:
+            result_text += f'  ✅ #{acc["id"]} {acc["phone"]}\n'
+        
+        result_text += f'\n💾 已删除 {len(deleted_sessions)} 个session文件\n'
+        result_text += f'\n📊 当前账号池:\n'
+        result_text += f'  总账号数: {len(accounts)}\n'
+        result_text += f'  可用账号: {sum(1 for a in accounts if a["status"] == "active")}'
+        
+        await update.message.reply_text(result_text)
         
         # 清除状态
         if user_id in user_states:
