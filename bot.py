@@ -268,9 +268,7 @@ class SalesBot:
             await self._handle_custom_button(query)
             return
 
-        if data == "show_product_overview":
-            await self._show_product_overview(query)
-        elif data == "show_categories":
+        if data == "show_categories":
             await self._show_categories(query)
         elif data.startswith("cat_"):
             category = data[4:]
@@ -598,12 +596,37 @@ class SalesBot:
 
         # 调用代购模块(传递 user_id 和 order_id 用于隔离)
         try:
-            files = await self.purchaser.purchase(
+            result = await self.purchaser.purchase(
                 product_id=state['product_id'],
                 quantity=quantity,
                 user_id=user_id,
                 order_id=order_id
             )
+            
+            # Handle result (dict or list for backward compatibility)
+            if isinstance(result, dict):
+                files = result['files']
+                requested_qty = result['requested_quantity']
+                actual_qty = result['actual_quantity']
+            else:
+                files = result
+                requested_qty = quantity
+                actual_qty = quantity
+            
+            # Partial success: refund difference
+            if actual_qty < requested_qty:
+                refund_qty = requested_qty - actual_qty
+                refund_amount = product_price * refund_qty
+                
+                conn = self.db.get_connection()
+                c = conn.cursor()
+                c.execute('UPDATE users SET balance = balance + ? WHERE user_id = ?', (refund_amount, user_id))
+                c.execute("INSERT INTO balance_logs (user_id, amount, type, order_id, notes) VALUES (?, ?, 'refund', ?, ?)",
+                          (user_id, refund_amount, order_id, f'Partial refund: {refund_qty} items'))
+                conn.commit()
+                conn.close()
+                
+                print(f'[INFO] Partial success: refunded {refund_amount:.2f} USDT for {refund_qty} items')
 
             # 更新订单状态
             conn = self.db.get_connection()
@@ -997,7 +1020,9 @@ class SalesBot:
 
         # 原版布局:4个按钮 + 自定义按钮(语言切换移到最底部)
         keyboard = [
-            [InlineKeyboardButton(get_text('btn_products', lang), callback_data='show_product_overview')],
+            [InlineKeyboardButton('TG Tdada|session|api', callback_data='cat_tdata+session+api')],
+            [InlineKeyboardButton('TG session only', callback_data='cat_session')],
+            [InlineKeyboardButton('TG Tdada only', callback_data='cat_tdata')],
             [
                 InlineKeyboardButton(get_text('btn_recharge', lang), callback_data='recharge'),
                 InlineKeyboardButton(get_text('btn_orders', lang), callback_data='orders')

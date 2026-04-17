@@ -100,6 +100,18 @@ class AutoPurchaser:
                 # 2. 查找并点击商品
                 await self._click_product(name)
                 
+                # 2.5. Check actual stock on product page
+                available_stock = await self._check_available_stock()
+                original_quantity = quantity
+                
+                if available_stock == 0:
+                    raise Exception(f"Source bot out of stock: {name}")
+                
+                if available_stock < quantity:
+                    print(f"[WARN] Insufficient stock: requested {quantity}, actual {available_stock}, auto-adjusted")
+                    quantity = available_stock
+                
+                
                 # 3. 点击购买
                 await self._click_buy()
                 
@@ -198,6 +210,31 @@ class AutoPurchaser:
                         return
         
         raise Exception('未找到购买按钮')
+    
+    async def _check_available_stock(self):
+        """Check actual stock from source bot product page"""
+        msgs = await self.client.get_messages(Config.SOURCE_BOT, limit=1)
+        
+        if msgs and msgs[0].text:
+            text = msgs[0].text
+            
+            # Match stock patterns
+            stock_patterns = [
+                r'当前库存[：:]\s*(\d+)',
+                r'库存[：:]\s*(\d+)',
+                r'[Ss]tock[：:]\s*(\d+)',
+            ]
+            
+            for pattern in stock_patterns:
+                match = re.search(pattern, text)
+                if match:
+                    stock = int(match.group(1))
+                    print(f'[INFO] Stock detected: {stock}')
+                    return stock
+        
+        # If not found, assume sufficient
+        print('[WARN] Stock info not found, assuming sufficient')
+        return 9999
     
     async def _input_quantity(self, quantity):
         """输入购买数量"""
