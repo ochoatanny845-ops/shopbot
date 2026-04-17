@@ -233,7 +233,7 @@ class AutoPurchaser:
         
         files = []
         start_time = asyncio.get_event_loop().time()
-        timeout = 60  # 60秒超时
+        timeout = 120  # 120秒超时（增加以应对大文件下载）
         
         while len(files) < 3:  # 1 txt + 2 zip = 3个文件
             # 检查超时
