@@ -211,6 +211,47 @@ class ScraperPoolManager:
         
         await self.send_telegram_alert(message)
     
+    async def send_stock_update_notification(self, account, elapsed):
+        """发送库存更新通知"""
+        try:
+            # 从数据库获取商品统计
+            import sqlite3
+            db_path = os.getenv('DATABASE_PATH', 'shopbot.db')
+            
+            conn = sqlite3.connect(db_path)
+            c = conn.cursor()
+            
+            # 查询总商品数
+            c.execute('SELECT COUNT(*) FROM products WHERE is_active = 1')
+            total_products = c.fetchone()[0]
+            
+            # 查询分类数
+            c.execute('SELECT COUNT(DISTINCT category) FROM products WHERE is_active = 1')
+            category_count = c.fetchone()[0]
+            
+            conn.close()
+            
+            # 计算下次更新时间
+            from datetime import datetime, timedelta
+            now = datetime.now()
+            next_update = now + timedelta(seconds=self.rotation_interval)
+            
+            message = (
+                f"✅ 库存已更新！\n\n"
+                f"🕐 更新时间: {now.strftime('%H:%M:%S')}\n"
+                f"📦 总商品数: {total_products}\n"
+                f"📊 分类数: {category_count}\n"
+                f"⏱️ 耗时: {elapsed:.1f} 秒\n"
+                f"🔄 下次更新: {next_update.strftime('%H:%M:%S')}\n\n"
+                f"使用账号: #{account['id']} ({account['phone']})"
+            )
+            
+            await self.send_telegram_alert(message)
+            print(f'  📢 已发送库存更新通知')
+            
+        except Exception as e:
+            print(f'  ⚠️ 发送更新通知失败: {e}')
+    
     async def run(self):
         """主循环"""
         print('='*60)
@@ -253,6 +294,9 @@ class ScraperPoolManager:
                 account['status'] = 'active'
                 account['success_count'] += 1
                 account['last_used'] = int(time.time())
+                
+                # 发送库存更新通知
+                await self.send_stock_update_notification(account, elapsed)
                 
                 # 自动调整轮换间隔
                 if elapsed > 100 and self.rotation_interval < 120:
