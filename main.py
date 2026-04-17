@@ -1,36 +1,25 @@
 """
-主程序
+主程序（代购版 - 不参与商品抓取）
+商品抓取由独立的 scraper_pool_manager.py 负责
 """
 import asyncio
 import sys
-from scraper import ProductScraper
+# from scraper import ProductScraper  # 不再需要
 from purchaser import AutoPurchaser
 from bot import SalesBot
 from database import Database
-from config import Config
+# from config import Config  # 不再需要同步间隔
 
 # 设置控制台编码
 sys.stdout.reconfigure(encoding='utf-8')
 
-async def sync_products_loop(scraper):
-    """商品同步循环"""
-    # 先等待，再同步
-    await asyncio.sleep(Config.SYNC_INTERVAL)
-    
-    while True:
-        try:
-            print(f'\n🔄 开始定时同步商品...')
-            await scraper.scrape_all()
-            print(f'✅ 定时同步完成，下次同步时间: {Config.SYNC_INTERVAL // 60} 分钟后\n')
-        except Exception as e:
-            print(f'❌ 定时同步失败: {e}')
-        
-        await asyncio.sleep(Config.SYNC_INTERVAL)
-
 async def main():
     """主函数"""
     print('='*60)
-    print('🤖 Telegram 账号代购销售系统')
+    print('🤖 Telegram 账号代购销售系统（代购版）')
+    print('='*60)
+    print('💡 商品抓取由独立的 scraper_pool_manager.py 负责')
+    print('💡 本程序只负责购买和销售')
     print('='*60)
     
     # 初始化数据库
@@ -44,9 +33,9 @@ async def main():
     purchaser = AutoPurchaser(buyer_client)
     await purchaser.start()
     
-    # 初始化商品抓取器（共享客户端）
-    scraper = ProductScraper(buyer_client)
-    await scraper.start()
+    # ❌ 不再初始化商品抓取器
+    # scraper = ProductScraper(buyer_client)
+    # await scraper.start()
     
     # 检查数据库中是否有商品
     conn = db.get_connection()
@@ -56,17 +45,13 @@ async def main():
     conn.close()
     
     if product_count > 0:
-        print(f'✅ 检测到 {product_count} 个商品，跳过首次同步')
-        print(f'⏰ 将在 {Config.SYNC_INTERVAL // 60} 分钟后自动同步')
+        print(f'✅ 检测到 {product_count} 个商品')
     else:
-        print('📊 首次启动，开始抓取商品...')
-        try:
-            await scraper.scrape_all()
-        except Exception as e:
-            print(f'⚠️ 首次同步失败: {e}')
+        print('⚠️ 数据库中暂无商品')
+        print('💡 请确保 scraper_pool_manager.py 正在运行')
     
-    # 启动定时同步（60分钟后开始）
-    asyncio.create_task(sync_products_loop(scraper))
+    # ❌ 不再启动定时同步
+    # asyncio.create_task(sync_products_loop(scraper))
     
     # 启动销售机器人（异步方式）
     sales_bot = SalesBot(purchaser)

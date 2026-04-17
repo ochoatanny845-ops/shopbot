@@ -25,6 +25,9 @@ class Config:
     # 管理员用户ID（逗号分隔）
     ADMIN_IDS = [int(x.strip()) for x in os.getenv('ADMIN_IDS', '6919491196').split(',')]
     
+    # 告警通知接收者（用于刷新器告警）
+    ADMIN_USER_ID = int(os.getenv('ADMIN_USER_ID', '5991190607'))  # 默认为你的ID
+    
     # ============================================
     # 源机器人配置
     # ============================================
