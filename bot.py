@@ -232,6 +232,13 @@ class SalesBot:
         data = query.data
         user_id = query.from_user.id
 
+        # 刷新菜单（实时更新库存）
+        if data == 'refresh_menu':
+            lang = self.get_user_language(user_id) or 'zh'
+            await self.show_main_menu(query, user_id, lang)
+            await query.answer('✅ 已刷新', show_alert=False)
+            return
+
         # 语言选择回调
         if data.startswith('lang_'):
             lang = data.split('_')[1]
@@ -1062,7 +1069,8 @@ class SalesBot:
             [
                 InlineKeyboardButton(get_text('btn_recharge', lang), callback_data='recharge'),
                 InlineKeyboardButton(get_text('btn_orders', lang), callback_data='orders')
-            ]
+            ],
+            [InlineKeyboardButton('🔄 刷新库存', callback_data='refresh_menu')]
         ]
 
         # 自定义按钮
