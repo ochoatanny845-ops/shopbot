@@ -131,10 +131,6 @@ class ScraperPoolManager:
         elapsed = time.time() - start_time
         print(f'  ✅ 抓取完成，耗时 {elapsed:.1f} 秒')
         
-        # 如果超过50秒，建议增加轮换间隔
-        if elapsed > 50 and self.rotation_interval < 120:
-            print(f'  ⚠️ 抓取耗时较长，建议将轮换间隔改为 120 秒')
-        
         await client.disconnect()
         
         return elapsed
@@ -250,6 +246,14 @@ class ScraperPoolManager:
                 account['status'] = 'active'
                 account['success_count'] += 1
                 account['last_used'] = int(time.time())
+                
+                # 自动调整轮换间隔
+                if elapsed > 100 and self.rotation_interval < 120:
+                    print(f'  ⚙️ 抓取耗时 {elapsed:.1f}秒，自动将轮换间隔调整为 120 秒')
+                    self.rotation_interval = 120
+                elif elapsed < 50 and self.rotation_interval > 60:
+                    print(f'  ⚙️ 抓取耗时 {elapsed:.1f}秒，可以将轮换间隔调整为 60 秒')
+                    self.rotation_interval = 60
                 
             except BannedException as e:
                 # 账号被封
