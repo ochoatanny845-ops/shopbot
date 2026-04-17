@@ -460,21 +460,22 @@ class AccountManagerBot:
         
         msg = await update.message.reply_text(f'⏳ 开始批量添加 {total} 个账号...')
         
+        # 在循环外获取起始ID，避免ID冲突
+        config_file = 'accounts_pool.json'
+        next_id = 1
+        
+        if os.path.exists(config_file):
+            with open(config_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                existing_accounts = data.get('accounts', [])
+                if existing_accounts:
+                    next_id = max(a['id'] for a in existing_accounts) + 1
+        
         for i, acc in enumerate(accounts, 1):
             phone = acc['phone']
             api_url = acc['api_url']
             
-            # 获取下一个账号ID
-            config_file = 'accounts_pool.json'
-            next_id = 1
-            
-            if os.path.exists(config_file):
-                with open(config_file, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    existing_accounts = data.get('accounts', [])
-                    if existing_accounts:
-                        next_id = max(a['id'] for a in existing_accounts) + 1
-            
+            # 使用递增的ID
             session_file = f'sessions/scraper_{next_id}.session'
             
             # 更新进度
@@ -493,6 +494,7 @@ class AccountManagerBot:
                 # 保存账号
                 await self.save_account(next_id, session_file, '+' + phone)
                 success += 1
+                next_id += 1  # 成功后递增ID
                 
                 # 更新进度
                 progress_text = (
@@ -504,6 +506,7 @@ class AccountManagerBot:
                 await msg.edit_text(progress_text)
             else:
                 failed += 1
+                next_id += 1  # 失败也要递增ID，避免冲突
                 error = result.get('error', '未知错误')
                 
                 # 更新进度
