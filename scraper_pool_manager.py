@@ -269,16 +269,26 @@ class ScraperPoolManager:
                 account['fail_count'] += 1
                 await self.send_ban_alert(account)
                 print(f'  ❌ 账号 #{account["id"]} 已被标记为封禁')
-                
+            
             except Exception as e:
-                # 其他错误
-                account['fail_count'] += 1
-                print(f'  ❌ 抓取失败: {e}')
-                
-                # 连续失败5次标记为失败状态
-                if account['fail_count'] > 5:
+                # 检查是否是Session失效
+                if 'session expired' in str(e).lower():
                     account['status'] = 'failed'
-                    print(f'  ⚠️ 账号 #{account["id"]} 连续失败，标记为失败状态')
+                    print(f'  ⚠️ 账号 #{account["id"]} Session失效，已标记为失败状态')
+                    print(f'  💡 提示：可使用账号管理Bot重新添加该账号')
+                    print(f'  ⏭️ 自动跳过，使用下一个账号...')
+                else:
+                    # 其他错误
+                    account['fail_count'] += 1
+                    print(f'  ❌ 抓取失败: {e}')
+                    
+                    # 连续失败5次标记为失败状态
+                    if account['fail_count'] > 5:
+                        account['status'] = 'failed'
+                        print(f'  ⚠️ 账号 #{account["id"]} 连续失败，标记为失败状态')
+                        print(f'  ⏭️ 自动跳过，使用下一个账号...')
+                    else:
+                        print(f'  ⏭️ 将在下次轮换时重试...')
             
             # 保存状态
             self.save_config()
