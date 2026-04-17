@@ -215,6 +215,9 @@ class ProductScraper:
         conn = self.db.get_connection()
         c = conn.cursor()
         
+        # 先标记所有商品为失效（每次抓取前清理）
+        c.execute('UPDATE products SET is_active = 0')
+        
         for p in products:
             # 生成唯一ID
             unique_id = f"{p['category']}:{p['name']}"
