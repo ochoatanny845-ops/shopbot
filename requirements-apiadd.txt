@@ -1,0 +1,2 @@
+sseclient-py
+beautifulsoup4
