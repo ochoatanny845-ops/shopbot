@@ -112,7 +112,7 @@ class ProductScraper:
                 for btn in row:
                     if category in btn.text:
                         await btn.click()
-                        await asyncio.sleep(2)
+                        await asyncio.sleep(3)  # 增加到3秒，等待商品加载
                         clicked = True
                         break
                 if clicked:
@@ -124,6 +124,9 @@ class ProductScraper:
         # 抓取商品（支持翻页，最多3页）
         products = []
         for page in range(1, 4):
+            # 等待商品列表加载完成
+            await asyncio.sleep(1)
+            
             msgs = await self.client.get_messages(Config.SOURCE_BOT, limit=1)
             
             if not msgs or not msgs[0].buttons:
