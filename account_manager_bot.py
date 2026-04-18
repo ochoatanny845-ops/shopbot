@@ -425,6 +425,14 @@ class AccountManagerBot:
         """保存账号到配置文件"""
         config_file = 'accounts_pool.json'
         
+        # 备份现有配置
+        if os.path.exists(config_file):
+            import shutil
+            from datetime import datetime
+            backup_file = f'{config_file}.backup_{datetime.now().strftime("%Y%m%d_%H%M%S")}'
+            shutil.copy2(config_file, backup_file)
+            print(f'✅ 已备份配置到 {backup_file}')
+        
         new_account = {
             'id': account_id,
             'session': session_file,
@@ -446,11 +454,18 @@ class AccountManagerBot:
                 'rotation_interval': 60
             }
         
+        # 检查是否已存在该ID，避免重复
+        existing_ids = {acc['id'] for acc in data['accounts']}
+        if account_id in existing_ids:
+            print(f'⚠️ 账号ID {account_id} 已存在，跳过保存')
+            return None
+        
         data['accounts'].append(new_account)
         
         with open(config_file, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
         
+        print(f'✅ 已保存账号 #{account_id}: {phone}')
         return new_account
     
     async def handle_apiadd_text(self, update: Update, state, text):
