@@ -10,6 +10,7 @@ from recharge_handler import RechargeHandler
 from admin_handler import AdminHandler
 from language import get_text, translate_product_name, translate_category_name
 from datetime import datetime, timezone, timedelta
+from admin_notification import notify_admin_purchase
 
 # UTC+8 时区（北京/香港时间）
 UTC8 = timezone(timedelta(hours=8))
@@ -655,6 +656,21 @@ class SalesBot:
             ''', (order_id,))
             conn.commit()
             conn.close()
+            
+            # 🔔 通知管理员购买订单
+            try:
+                await notify_admin_purchase(
+                    bot=context.bot,
+                    user_id=user_id,
+                    username=update.effective_user.username if update.effective_user.username else "未知用户",
+                    product_name=state['product_name'],
+                    quantity=actual_qty,
+                    total_price=total_price,
+                    order_id=order_id
+                )
+                print(f'✅ 已通知管理员购买订单：用户{user_id}, 商品{state["product_name"]}, 金额${total_price}')
+            except Exception as e:
+                print(f'❌ 通知管理员失败: {e}')
 
             # 删除"订单处理中..."的消息
             try:

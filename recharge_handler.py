@@ -14,6 +14,7 @@ from trc20_recharge import TRC20Recharge
 from okpay_handler import OKPayHandler
 from config import Config
 from language import get_text
+from admin_notification import notify_admin_recharge
 
 class RechargeHandler:
     """充值处理器"""
@@ -565,6 +566,21 @@ class RechargeHandler:
                      f'当前余额：${self._get_user_balance(user_id):.2f}',
                 parse_mode='Markdown'
             )
+            
+            # 🔔 通知管理员
+            try:
+                username = update.effective_user.username if update.effective_user else "未知用户"
+                await notify_admin_recharge(
+                    bot=context.bot,
+                    user_id=user_id,
+                    username=username,
+                    amount=actual_amount,
+                    method='trc20',
+                    order_id=order_id
+                )
+                print(f'✅ 已通知管理员TRC20充值：用户{user_id}, 金额${actual_amount}')
+            except Exception as e:
+                print(f'❌ 通知管理员失败: {e}')
         else:
             # 验证失败
             await msg.edit_text(
@@ -683,6 +699,20 @@ class RechargeHandler:
                 f'{get_text("current_balance_prefix", lang)} ${new_balance:.2f}',
                 parse_mode='Markdown'
             )
+            
+            # 🔔 通知管理员
+            try:
+                await notify_admin_recharge(
+                    bot=context.bot,
+                    user_id=user_id,
+                    username=query.from_user.username if query.from_user.username else "未知用户",
+                    amount=result["amount"],
+                    method='okpay',
+                    order_id=order_id
+                )
+                print(f'✅ 已通知管理员OKPay充值：用户{user_id}, 金额${result["amount"]}')
+            except Exception as e:
+                print(f'❌ 通知管理员失败: {e}')
         elif result['success'] and result['status'] == 0:
             # 未支付
             await query.edit_message_text(
