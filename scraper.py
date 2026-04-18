@@ -29,6 +29,9 @@ class ProductScraper:
         print(f'📊 开始抓取商品...')
         
         try:
+            # 自动检测并切换语言为中文
+            await self._ensure_chinese_language()
+            
             # 发送 🏠主菜单 回到主页
             await self.client.send_message(Config.SOURCE_BOT, '🏠主菜单')
             await asyncio.sleep(2)
@@ -251,6 +254,71 @@ class ProductScraper:
         conn.commit()
         conn.close()
         print(f'✅ 保存了 {len(products)} 个商品到数据库')
+    
+    async def _ensure_chinese_language(self):
+        """确保机器人语言为中文，如果不是则自动切换"""
+        try:
+            # 发送主菜单命令
+            await self.client.send_message(Config.SOURCE_BOT, '/start')
+            await asyncio.sleep(2)
+            
+            msgs = await self.client.get_messages(Config.SOURCE_BOT, limit=1)
+            
+            if not msgs or not msgs[0].buttons:
+                return
+            
+            # 检查是否为英文界面
+            is_english = False
+            for row in msgs[0].buttons:
+                for btn in row:
+                    if 'Account List' in btn.text or 'Language' in btn.text:
+                        is_english = True
+                        break
+                if is_english:
+                    break
+            
+            if is_english:
+                print('🌐 检测到英文界面，自动切换为中文...')
+                
+                # 查找并点击语言按钮
+                language_clicked = False
+                for row in msgs[0].buttons:
+                    for btn in row:
+                        if '🌐' in btn.text or 'Language' in btn.text:
+                            await btn.click()
+                            await asyncio.sleep(2)
+                            language_clicked = True
+                            break
+                    if language_clicked:
+                        break
+                
+                if language_clicked:
+                    # 获取语言选择菜单
+                    msgs2 = await self.client.get_messages(Config.SOURCE_BOT, limit=1)
+                    
+                    if msgs2 and msgs2[0].buttons:
+                        # 查找并点击中文按钮
+                        chinese_clicked = False
+                        for row in msgs2[0].buttons:
+                            for btn in row:
+                                if '中文简体' in btn.text or '简体中文' in btn.text or '中文' in btn.text:
+                                    await btn.click()
+                                    await asyncio.sleep(2)
+                                    chinese_clicked = True
+                                    print('✅ 语言已切换为中文')
+                                    break
+                            if chinese_clicked:
+                                break
+                        
+                        if not chinese_clicked:
+                            print('⚠️ 未找到中文按钮，尝试发送文本')
+                            await self.client.send_message(Config.SOURCE_BOT, '简体中文')
+                            await asyncio.sleep(2)
+            else:
+                print('✅ 当前已是中文界面')
+                
+        except Exception as e:
+            print(f'⚠️ 语言检测失败（继续执行）: {e}')
     
     async def stop(self):
         """停止客户端"""
