@@ -659,10 +659,14 @@ class SalesBot:
             
             # 🔔 通知管理员购买订单
             try:
+                # 防御性获取bot实例
+                bot_instance = self.application.bot
+                user_username = update.effective_user.username if (update and update.effective_user and update.effective_user.username) else "未知用户"
+                
                 await notify_admin_purchase(
-                    bot=context.bot,
+                    bot=bot_instance,
                     user_id=user_id,
-                    username=update.effective_user.username if update.effective_user.username else "未知用户",
+                    username=user_username,
                     product_name=state['product_name'],
                     quantity=actual_qty,
                     total_price=total_price,
@@ -671,6 +675,8 @@ class SalesBot:
                 print(f'✅ 已通知管理员购买订单：用户{user_id}, 商品{state["product_name"]}, 金额${total_price}')
             except Exception as e:
                 print(f'❌ 通知管理员失败: {e}')
+                import traceback
+                traceback.print_exc()
 
             # 删除"订单处理中..."的消息
             try:
