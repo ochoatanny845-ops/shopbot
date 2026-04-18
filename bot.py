@@ -660,7 +660,7 @@ class SalesBot:
             # 🔔 通知管理员购买订单
             try:
                 # 防御性获取bot实例
-                bot_instance = self.application.bot
+                bot_instance = self.app.bot if self.app else context.bot
                 user_username = update.effective_user.username if (update and update.effective_user and update.effective_user.username) else "未知用户"
                 
                 await notify_admin_purchase(
