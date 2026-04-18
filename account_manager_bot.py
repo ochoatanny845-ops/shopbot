@@ -303,31 +303,53 @@ class AccountManagerBot:
         
         await update.message.reply_text(f'📞 正在发送验证码到 {phone}...')
         
-        try:
-            # 创建Telethon客户端
-            client = TelegramClient(session_file, Config.API_ID, Config.API_HASH)
-            await client.connect()
-            
-            # 发送验证码
-            result = await client.send_code_request(phone)
-            
-            # 保存状态
-            state['step'] = 'code'
-            state['phone'] = phone
-            state['session_file'] = session_file
-            state['client'] = client
-            state['phone_code_hash'] = result.phone_code_hash
-            state['account_id'] = next_id
-            
-            await update.message.reply_text(
-                f'✅ 验证码已发送到 {phone}\n\n'
-                f'📝 请输入验证码（纯数字）\n'
-                f'提示：检查Telegram消息'
-            )
-            
-        except Exception as e:
-            await update.message.reply_text(f'❌ 发送验证码失败：{e}')
-            del user_states[user_id]
+        # 重试机制
+        max_retries = 3
+        retry_delay = 2  # 秒
+        
+        for attempt in range(1, max_retries + 1):
+            try:
+                # 创建Telethon客户端
+                client = TelegramClient(session_file, Config.API_ID, Config.API_HASH)
+                await client.connect()
+                
+                # 发送验证码
+                result = await client.send_code_request(phone)
+                
+                # 保存状态
+                state['step'] = 'code'
+                state['phone'] = phone
+                state['session_file'] = session_file
+                state['client'] = client
+                state['phone_code_hash'] = result.phone_code_hash
+                state['account_id'] = next_id
+                
+                await update.message.reply_text(
+                    f'✅ 验证码已发送到 {phone}\n\n'
+                    f'📝 请输入验证码（纯数字）\n'
+                    f'提示：检查Telegram消息'
+                )
+                return  # 成功，退出重试循环
+                
+            except Exception as e:
+                error_msg = str(e)
+                if attempt < max_retries:
+                    await update.message.reply_text(
+                        f'⚠️ 发送失败（尝试 {attempt}/{max_retries}）: {error_msg}\n'
+                        f'⏳ {retry_delay}秒后重试...'
+                    )
+                    await asyncio.sleep(retry_delay)
+                else:
+                    await update.message.reply_text(
+                        f'❌ 发送验证码失败（已重试{max_retries}次）\n\n'
+                        f'错误: {error_msg}\n\n'
+                        f'💡 建议:\n'
+                        f'1. 检查网络连接\n'
+                        f'2. 稍后再试\n'
+                        f'3. 尝试手动添加账号'
+                    )
+                    if user_id in user_states:
+                        del user_states[user_id]
     
     async def handle_code_input(self, update: Update, state, code):
         """处理验证码输入"""
