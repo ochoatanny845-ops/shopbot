@@ -1,9 +1,8 @@
 """
-多账号轮换刷新管理器
-- 20个账号轮流抓取商品
-- 每1分钟换一个账号
+库存定时同步管理器
+- 固定账号每5分钟同步一次库存
+- 账号失败时自动切换到下一个
 - 自动检测封禁并告警
-- 可用账号<5个时发送警告
 """
 import asyncio
 import json
@@ -16,13 +15,13 @@ from scraper import ProductScraper
 from config import Config
 
 class ScraperPoolManager:
-    """刷新器账号池管理器"""
+    """库存同步管理器"""
     
     def __init__(self, config_file='accounts_pool.json'):
         self.config_file = config_file
         self.accounts = []
-        self.current_index = 0
-        self.rotation_interval = 60  # 默认1分钟
+        self.current_account_index = 0
+        self.sync_interval = 300  # 5分钟同步一次
         self.banned_notify_sent = set()
         self.low_accounts_notified = False
         self.load_config()
@@ -31,45 +30,58 @@ class ScraperPoolManager:
         """加载账号配置"""
         if not os.path.exists(self.config_file):
             print(f'⚠️ 配置文件不存在: {self.config_file}')
-            print(f'💡 请先运行 upload_accounts.py 上传账号')
+            print(f'💡 脚本启动时会自动初始化账号池')
             self.accounts = []
             return
         
         with open(self.config_file, 'r', encoding='utf-8') as f:
             data = json.load(f)
             self.accounts = data.get('accounts', [])
-            self.current_index = data.get('current_index', 0)
-            self.rotation_interval = data.get('rotation_interval', 60)
+            self.current_account_index = data.get('current_index', 0)
+            # 兼容旧配置：如果有 rotation_interval，忽略它
+            if 'sync_interval' in data:
+                self.sync_interval = data['sync_interval']
         
         print(f'✅ 加载了 {len(self.accounts)} 个账号')
-        print(f'⏱️ 轮换间隔: {self.rotation_interval} 秒')
+        print(f'⏱️ 同步间隔: {self.sync_interval} 秒 ({self.sync_interval // 60} 分钟)')
     
     def save_config(self):
         """保存账号状态"""
         data = {
             'accounts': self.accounts,
-            'current_index': self.current_index,
-            'rotation_interval': self.rotation_interval
+            'current_index': self.current_account_index,
+            'sync_interval': self.sync_interval
         }
         with open(self.config_file, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
     
-    def get_next_account(self):
-        """获取下一个可用账号（轮换）"""
+    def get_current_account(self):
+        """获取当前使用的账号（失败时自动切换）"""
         if not self.accounts:
             return None
         
+        # 确保索引不越界
+        if self.current_account_index >= len(self.accounts):
+            self.current_account_index = 0
+        
+        # 尝试找到一个可用账号
         tried = 0
         while tried < len(self.accounts):
-            account = self.accounts[self.current_index]
-            self.current_index = (self.current_index + 1) % len(self.accounts)
+            account = self.accounts[self.current_account_index]
             
             if account['status'] == 'active':
                 return account
             
+            # 当前账号不可用，尝试下一个
+            self.current_account_index = (self.current_account_index + 1) % len(self.accounts)
             tried += 1
         
-        return None  # 没有可用账号
+        return None  # 所有账号都不可用
+    
+    def switch_to_next_account(self):
+        """切换到下一个账号"""
+        self.current_account_index = (self.current_account_index + 1) % len(self.accounts)
+        print(f'  🔄 切换到下一个账号 (索引: {self.current_account_index})')
     
     def count_active_accounts(self):
         """统计可用账号数量"""
@@ -110,7 +122,7 @@ class ScraperPoolManager:
             Config.API_HASH
         )
         
-        # 非交互式连接（不要求输入手机号/验证码）
+        # 非交互式连接
         await client.connect()
         
         # 检查是否已登录
@@ -131,7 +143,7 @@ class ScraperPoolManager:
         # 记录开始时间
         start_time = time.time()
         
-        # 抓取商品（返回统计信息）
+        # 抓取商品
         stats = await scraper.scrape_all()
         
         # 记录耗时
@@ -140,7 +152,7 @@ class ScraperPoolManager:
         
         await client.disconnect()
         
-        # 返回耗时和统计信息
+        # 返回统计信息
         return {
             'elapsed': elapsed,
             'total_products': stats.get('total_products', 0),
@@ -149,12 +161,10 @@ class ScraperPoolManager:
         }
     
     async def send_telegram_alert(self, message):
-        """发送Telegram告警给管理员（通过账号管理Bot）"""
+        """发送Telegram告警给管理员"""
         try:
-            # 使用账号管理Bot发送告警
             from telegram import Bot
             
-            # 账号管理Bot Token
             ALERT_BOT_TOKEN = '8680801765:AAH9C4uERN9-14hq7p4kfN1EX2wg744syEc'
             ADMIN_ID = 5991190607
             
@@ -170,7 +180,7 @@ class ScraperPoolManager:
     async def send_ban_alert(self, account):
         """发送封禁告警"""
         if account['id'] in self.banned_notify_sent:
-            return  # 已通知过
+            return
         
         active_count = self.count_active_accounts()
         
@@ -208,7 +218,7 @@ class ScraperPoolManager:
         self.low_accounts_notified = True
     
     async def send_critical_alert(self):
-        """发送严重告警（所有账号不可用）"""
+        """发送严重告警"""
         message = (
             f"🆘 严重警报：所有刷新账号均不可用！\n\n"
             f"系统无法更新商品库存\n"
@@ -220,10 +230,9 @@ class ScraperPoolManager:
     async def send_stock_update_notification(self, account, elapsed, total_products, total_categories, total_stock):
         """发送库存更新通知"""
         try:
-            # 计算下次更新时间
             from datetime import datetime, timedelta
             now = datetime.now()
-            next_update = now + timedelta(seconds=self.rotation_interval)
+            next_update = now + timedelta(seconds=self.sync_interval)
             
             message = (
                 f"✅ 库存已更新！\n\n"
@@ -232,7 +241,7 @@ class ScraperPoolManager:
                 f"📊 分类数: {total_categories}\n"
                 f"🏪 总库存: {total_stock:,}\n"
                 f"⏱️ 耗时: {elapsed:.1f} 秒\n"
-                f"🔄 下次更新: {next_update.strftime('%H:%M:%S')}\n\n"
+                f"🔄 下次更新: {next_update.strftime('%H:%M:%S')} ({self.sync_interval // 60} 分钟后)\n\n"
                 f"使用账号: #{account['id']} ({account['phone']})"
             )
             
@@ -243,24 +252,25 @@ class ScraperPoolManager:
             print(f'  ⚠️ 发送更新通知失败: {e}')
     
     async def run(self):
-        """主循环"""
+        """主循环 - 每5分钟同步一次"""
         print('='*60)
-        print('🔄 多账号轮换刷新器启动')
+        print('🔄 库存定时同步器启动')
         print('='*60)
         
         if not self.accounts:
-            print('❌ 无可用账号，请先运行 upload_accounts.py 上传账号')
+            print('❌ 账号池为空，脚本启动时会自动初始化')
+            print('💡 如果持续为空，请检查账号初始化逻辑')
             return
         
         print(f'📊 账号池状态:')
         print(f'  - 总账号数: {len(self.accounts)}')
         print(f'  - 可用账号: {self.count_active_accounts()}')
-        print(f'  - 轮换间隔: {self.rotation_interval} 秒')
+        print(f'  - 同步间隔: {self.sync_interval} 秒 ({self.sync_interval // 60} 分钟)')
         print('='*60)
         
         while True:
-            # 获取下一个可用账号
-            account = self.get_next_account()
+            # 获取当前账号
+            account = self.get_current_account()
             
             if account is None:
                 # 所有账号都不可用
@@ -274,10 +284,10 @@ class ScraperPoolManager:
             if active_count < 5:
                 await self.send_low_accounts_alert()
             else:
-                self.low_accounts_notified = False  # 恢复通知标志
+                self.low_accounts_notified = False
             
             try:
-                # 使用该账号抓取（返回统计信息）
+                # 使用该账号抓取
                 result = await self.scrape_with_account(account)
                 
                 # 提取数据
@@ -291,50 +301,41 @@ class ScraperPoolManager:
                 account['success_count'] += 1
                 account['last_used'] = int(time.time())
                 
-                # 发送库存更新通知
+                # 发送更新通知
                 await self.send_stock_update_notification(account, elapsed, total_products, total_categories, total_stock)
                 
-                # 自动调整轮换间隔
-                if elapsed > 100 and self.rotation_interval < 120:
-                    print(f'  ⚙️ 抓取耗时 {elapsed:.1f}秒，自动将轮换间隔调整为 120 秒')
-                    self.rotation_interval = 120
-                elif elapsed < 50 and self.rotation_interval > 60:
-                    print(f'  ⚙️ 抓取耗时 {elapsed:.1f}秒，可以将轮换间隔调整为 60 秒')
-                    self.rotation_interval = 60
-                
             except BannedException as e:
-                # 账号被封
+                # 账号被封，切换到下一个
                 account['status'] = 'banned'
                 account['banned_at'] = int(time.time())
                 account['fail_count'] += 1
                 await self.send_ban_alert(account)
                 print(f'  ❌ 账号 #{account["id"]} 已被标记为封禁')
+                self.switch_to_next_account()
             
             except Exception as e:
-                # 检查是否是Session失效
+                # 其他错误
                 if 'session expired' in str(e).lower():
                     account['status'] = 'failed'
                     print(f'  ⚠️ 账号 #{account["id"]} Session失效，已标记为失败状态')
                     print(f'  💡 提示：可使用账号管理Bot重新添加该账号')
-                    print(f'  ⏭️ 自动跳过，使用下一个账号...')
+                    self.switch_to_next_account()
                 else:
-                    # 其他错误
                     account['fail_count'] += 1
                     print(f'  ❌ 抓取失败: {e}')
                     
-                    # 连续失败5次标记为失败状态
+                    # 连续失败5次切换账号
                     if account['fail_count'] > 5:
                         account['status'] = 'failed'
                         print(f'  ⚠️ 账号 #{account["id"]} 连续失败，标记为失败状态')
-                        print(f'  ⏭️ 自动跳过，使用下一个账号...')
-                    else:
-                        print(f'  ⏭️ 将在下次轮换时重试...')
+                        self.switch_to_next_account()
             
             # 保存状态
             self.save_config()
             
-            # 等待下一次轮换
-            await asyncio.sleep(self.rotation_interval)
+            # 等待5分钟后下次同步
+            print(f'\n⏰ 等待 {self.sync_interval} 秒 ({self.sync_interval // 60} 分钟) 后进行下次同步...')
+            await asyncio.sleep(self.sync_interval)
 
 class BannedException(Exception):
     """账号被封异常"""
